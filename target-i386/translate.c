@@ -2994,12 +2994,18 @@ static void *sse_op_table5[256] = {
 };
 
 struct sse_op_helper_s {
-    void *op[2]; uint32_t ext_mask;
+    void *op[2]; 
+    uint32_t ext_mask;
+    uint32_t flags;
 };
 #define SSSE3_OP(x) { MMX_OP2(x), CPUID_EXT_SSSE3 }
 #define SSE41_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE41 }
 #define SSE42_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE42 }
 #define SSE41_SPECIAL { { NULL, SSE_SPECIAL }, CPUID_EXT_SSE41 }
+#define AVX128_OP(x, c) { NULL, gen_helper_ ## x ## _avx128 }, CPUID_EXT_##c|CPUID_EXT_AVX }
+#define AVX256_OP(x, c) { NULL, gen_helper_ ## x ## _avx128 }, CPUID_EXT_##c|CPUID_EXT_AVX }
+
+/* 0f 38 */
 static struct sse_op_helper_s sse_op_table6[256] = {
     [0x00] = SSSE3_OP(pshufb),
     [0x01] = SSSE3_OP(phaddw),
@@ -3049,6 +3055,7 @@ static struct sse_op_helper_s sse_op_table6[256] = {
     [0x41] = SSE41_OP(phminposuw),
 };
 
+/* 0f 3a */
 static struct sse_op_helper_s sse_op_table7[256] = {
     [0x08] = SSE41_OP(roundps),
     [0x09] = SSE41_OP(roundpd),
@@ -4149,6 +4156,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     // TODO:
     // L: 256bit 
     // vvvv: additional register 
+    // upper half clear semantics
 
     if (pre_sse_checks(s, pc_start))
 	return 0;
@@ -5428,8 +5436,6 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
 	vex:
 	    s->pc++;
 
-	    /* XXX I think address-size override is broken for SSE in
-	       general, but should be supported. The others are illegal. */
 	    if (prefixes & ~PREFIX_ADR)
 		goto illegal_op;
 	    if (gen_vex(s, b, b1, prefixes))
