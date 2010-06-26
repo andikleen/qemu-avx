@@ -3074,7 +3074,7 @@ static struct sse_op_helper_s sse_op_table7[256] = {
     [0x63] = SSE42_OP(pcmpistri),
 };
 
-static inline int pre_sse_checks(DisasContext *s)
+static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
 {
     /* simple MMX/SSE operation */
     if (s->flags & HF_TS_MASK) {
@@ -3088,12 +3088,13 @@ static inline int pre_sse_checks(DisasContext *s)
     return 0;
 }
 
-static int gen_sse_op38(DisasContext *s, int b, int b1)
+
+static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r)
 {
+    int op1_offset, op2_offset, reg_addr, offset_addr;
     unsigned modrm, rm, reg, mod;
     void *sse_op2;
 
-    b = modrm;
     modrm = ldub_code(s->pc++);
     rm = modrm & 7;
     reg = ((modrm >> 3) & 7) | rex_r;
@@ -3104,7 +3105,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1)
     sse_op2 = sse_op_table6[b].op[b1];
     if (!sse_op2)
 	return 1;
-    if (!(s->cpuid_ext_features & sse_op_table6[b].ext_mask))
+    if (!(s->cpuid_ext_features & sse_op_table6[op].ext_mask))
 	return 1;
 
     if (b1) {
@@ -3114,7 +3115,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1)
 	} else {
 	    op2_offset = offsetof(CPUX86State,xmm_t0);
 	    gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-	    switch (b) {
+	    switch (op) {
 	    case 0x20: case 0x30: /* pmovsxbw, pmovzxbw */
 	    case 0x23: case 0x33: /* pmovsxwd, pmovzxwd */
 	    case 0x25: case 0x35: /* pmovsxdq, pmovzxdq */
@@ -3137,7 +3138,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1)
 		break;
 	    case 0x2a:            /* movntqda */
 		gen_ldo_env_A0(s->mem_index, op1_offset);
-		return;
+		return 0;
 	    default:
 		gen_ldo_env_A0(s->mem_index, op2_offset);
 	    }
@@ -3159,14 +3160,15 @@ static int gen_sse_op38(DisasContext *s, int b, int b1)
     tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
     ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
 
-    if (b == 0x17)
+    if (op == 0x17)
 	s->cc_op = CC_OP_EFLAGS;
 
     return 0;
 }
 
-static int gen_sse_op3a(DisasContext *s, int b, int b1)
+static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r)
 {
+    int op1_offset, op2_offset, reg_addr, offset_addr, ot, val;
     unsigned modrm, rm, reg, mod;
     void *sse_op2;
 
@@ -3181,7 +3183,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1)
     sse_op2 = sse_op_table7[b].op[b1];
     if (!sse_op2)
 	return 1;
-    if (!(s->cpuid_ext_features & sse_op_table7[b].ext_mask))
+    if (!(s->cpuid_ext_features & sse_op_table7[op].ext_mask))
 	return 1;
 
     if (sse_op2 == SSE_SPECIAL) {
@@ -3191,7 +3193,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1)
 	    gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
 	reg = ((modrm >> 3) & 7) | rex_r;
 	val = ldub_code(s->pc++);
-	switch (b) {
+	switch (op) {
 	case 0x14: /* pextrb */
 	    tcg_gen_ld8u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							xmm_regs[reg].XMM_B(val & 15)));
@@ -3334,7 +3336,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1)
     }
     val = ldub_code(s->pc++);
 
-    if ((b & 0xfc) == 0x60) { /* pcmpXstrX */
+    if ((op & 0xfc) == 0x60) { /* pcmpXstrX */
 	s->cc_op = CC_OP_EFLAGS;
 
 	if (s->dflag == 2)
@@ -3348,7 +3350,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1)
     return 0;
 }
 
-static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse2_op,
+static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse_op2,
 		       int is_xmm, int b1)
 {
     int op1_offset, op2_offset, val, ot;
@@ -3904,7 +3906,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             if (s->prefix & PREFIX_REPNZ)
                 goto crc32;
         case 0x038:
-	    if (gen_sse_op38(s, modrm, b1))
+	    if (gen_sse_op38(s, modrm, b1, rex_r))
 		goto illegal_op;
             break;
         case 0x338: /* crc32 */
@@ -3939,7 +3941,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x03a:
         case 0x13a:
-	    if (gen_sse_op3a(s, modrm, b1))
+	    if (gen_sse_op3a(s, modrm, b1, rex_r))
 		goto illegal_op;
 	    break;
         default:
@@ -3993,11 +3995,11 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         switch(b) {
         case 0x0f: /* 3DNow! data insns */
             if (!(s->cpuid_ext2_features & CPUID_EXT2_3DNOW))
-                goto illegal_op;
+		goto illegal_op;
             val = ldub_code(s->pc++);
             sse_op2 = sse_op_table5[val];
             if (!sse_op2)
-                goto illegal_op;
+		goto illegal_op;
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
             ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
@@ -4013,7 +4015,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             /* compare insns */
             val = ldub_code(s->pc++);
             if (val >= 8)
-                goto illegal_op;
+		goto illegal_op;
             sse_op2 = sse_op_table4[val][b1];
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
@@ -4022,7 +4024,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0xf7:
             /* maskmov : we must prepare A0 */
             if (mod != 3)
-                goto illegal_op;
+		goto illegal_op;
 #ifdef TARGET_X86_64
             if (s->aflag == 2) {
                 gen_op_movq_A0_reg(R_EDI);
@@ -4049,12 +4051,18 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             s->cc_op = CC_OP_EFLAGS;
         }
     }
+
+    return 0;
+
+illegal_op:
+    return 1;
 }
 
 /* SSE2/3/4 classic */
 static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
 {
-    void *sse2_op;
+    int b1;
+    void *sse_op2;
     int is_xmm;
 
     if (s->prefix & PREFIX_DATA)
@@ -4066,7 +4074,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
     else
         b1 = 0;
 
-    if (pre_sse_checks(s))
+    if (pre_sse_checks(s, pc_start))
 	return 0;
 
     b &= 0xff;
@@ -4086,18 +4094,18 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
 
     if (is_xmm && !(s->flags & HF_OSFXSR_MASK))
         if ((b != 0x38 && b != 0x3a) || (s->prefix & PREFIX_DATA))
-            goto illegal_op;
+	    return 1;
     if (b == 0x0e) {
         if (!(s->cpuid_ext2_features & CPUID_EXT2_3DNOW))
-            goto illegal_op;
+            return 1;
         /* femms */
         gen_helper_emms();
-        return;
+        return 0;
     }
     if (b == 0x77) {
         /* emms */
         gen_helper_emms();
-        return;
+        return 0;
     }
     /* prepare MMX state (XXX: optimize by storing fptt and fptags in
        the static cpu state) */
@@ -4105,43 +4113,43 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
         gen_helper_enter_mmx();
     }
 
-    return gen_sse_avx(s, b, pc_start, rex_r, b1, is_xmm, b1);
+    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, is_xmm, b1);
 }
 
 /* Handle AVX with VEX prefixes */
 static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 {
     unsigned b2, mm, pp;
-    int rex_w, rex_r, op;
+    int rex_r, op;
     void *sse_op2;
-    
-    /* XXX I think address-size override is broken for SSE in general, but should be 
-       supported. The others are illegal. */
-    if (prefixes)
-	return 1;
 
+#ifdef TARGET_X86_64
     rex_r = ((~b1 & 0x80) >> 3);
+    s->rex_x = 0;
+    REX_B(s) = 0;
+#endif
     if (b == 0xc5) { /* 3 byte */
-	s->rex_x = ((~b1 & 0x40) >> 3);
-	REX_B(s) = ((~b1 & 0x20) >> 1);
-	b2 = ldup_code(s->pc++);
-	rex_w = (~b2 >> 7);
+#ifdef TARGET_X86_64
+	s->rex_x = (~b1 & 0x40) >> 3;
+	s->rex_b = (~b1 & 0x20) >> 1;
+#endif
+	b2 = ldub_code(s->pc++);
 	pp = b2 & 3;
 	mm = b1 & 0x1f;
     } else { /* 2 byte */
-	s->rex_x = 0;
-	REX_B(s) = 0;
-	rex_w = 0;
 	pp = b1 & 3;
 	mm = 1;
     }
 
-    // XXX rex_w?
+    // TODO:
+    // W: rex_w
+    // L: 256bit 
+    // vvvv: additional register 
 
-    if (pre_sse_checks(s))
+    if (pre_sse_checks(s, pc_start))
 	return 0;
 
-    op = ldup_code(s->pc++);    
+    op = ldub_code(s->pc++);    
     switch (mm) { 
     case 1:
 	sse_op2 = sse_op_table1[op][pp];
@@ -4149,9 +4157,9 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	    return 1;
 	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp);
     case 2:
-	return gen_sse_op38(s, op, pp); 
+	return gen_sse_op38(s, op, pp, rex_r); 
     case 3:
-	return gen_sse_op3a(s, op, pp);
+	return gen_sse_op3a(s, op, pp, rex_r);
     }
     return 1;
 }
@@ -4164,7 +4172,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
     int shift, ot;
     int modrm, reg, rm, mod, reg_addr, op, opreg, offset_addr, val;
     target_ulong next_eip, tval;
-    int rex_w, rex_r;
+    int rex_w, rex_r, b1;
 
     if (unlikely(qemu_loglevel_mask(CPU_LOG_TB_OP)))
         tcg_gen_debug_insn_start(pc_start);
@@ -5411,17 +5419,22 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         }
         break;
     case 0xc4: /* les Gv or VEX 2 byte */
-	b1 = ldup_code(s->pc);
+	b1 = ldub_code(s->pc);
 	if ((b1 & 0xb0) == 0xb0 && s->pe) {
 	vex:
 	    s->pc++;
+
+	    /* XXX I think address-size override is broken for SSE in
+	       general, but should be supported. The others are illegal. */
+	    if (prefixes)
+		goto illegal_op;
 	    if (gen_vex(s, b, b1, prefixes))
 		goto illegal_op;    
 	}
 	op = R_ES;
         goto do_lxx;
     case 0xc5: /* lds Gv or VEX 3 byte */
-	b1 = ldup_code(s->pc);
+	b1 = ldub_code(s->pc);
         if ((b1 & 0x80) && s->pe)
 	    goto vex;
         op = R_DS;
