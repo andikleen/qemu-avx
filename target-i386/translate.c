@@ -4123,6 +4123,9 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     int rex_r, op;
     void *sse_op2;
 
+    if (!(s->cpuid_ext_features & CPUID_EXT_AVX))
+	return 1;
+
 #ifdef TARGET_X86_64
     rex_r = ((~b1 & 0x80) >> 3);
     s->rex_x = 0;
@@ -4142,7 +4145,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     }
 
     // TODO:
-    // W: rex_w
+    // W: rex operand width
     // L: 256bit 
     // vvvv: additional register 
 
