@@ -391,6 +391,7 @@
 #define CPUID_EXT_TM2      (1 << 8)
 #define CPUID_EXT_SSSE3    (1 << 9)
 #define CPUID_EXT_CID      (1 << 10)
+#define CPUID_EXT_FMA      (1 << 12)
 #define CPUID_EXT_CX16     (1 << 13)
 #define CPUID_EXT_XTPR     (1 << 14)
 #define CPUID_EXT_PDCM     (1 << 15)
@@ -400,8 +401,10 @@
 #define CPUID_EXT_X2APIC   (1 << 21)
 #define CPUID_EXT_MOVBE    (1 << 22)
 #define CPUID_EXT_POPCNT   (1 << 23)
+#define CPUID_EXT_AES	   (1 << 25)
 #define CPUID_EXT_XSAVE    (1 << 26)
 #define CPUID_EXT_OSXSAVE  (1 << 27)
+#define CPUID_EXT_AVX  	   (1 << 28)
 #define CPUID_EXT_HYPERVISOR  (1 << 31)
 
 #define CPUID_EXT2_SYSCALL (1 << 11)
