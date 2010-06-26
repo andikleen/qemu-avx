@@ -36,7 +36,7 @@
 #define PREFIX_LOCK   0x04
 #define PREFIX_DATA   0x08
 #define PREFIX_ADR    0x10
-#define PREFIX_REX    0x20
+#define PREFIX_VEX    0x40
 
 #ifdef TARGET_X86_64
 #define X86_64_ONLY(x) x
@@ -2925,6 +2925,49 @@ static void *sse_op_table1[256][4] = {
     [0xfe] = MMX_OP2(paddl),
 };
 
+#define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
+
+static void *sse_op_table1_256[256][2] = {
+#if 0
+    [0x10] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
+    [0x11] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
+    [0x12] = { SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
+    [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+    [0x14] = { gen_helper_punpckldq_256, gen_helper_punpcklqdq_256 },
+    [0x15] = { gen_helper_punpckhdq_256, gen_helper_punpckhqdq_256 },
+    [0x16] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
+    [0x17] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
+    [0x28] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
+    [0x29] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
+    [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */
+    [0x51] = AVX256_FOP(sqrt),
+    [0x52] = { gen_helper_rsqrtps_256, NULL },
+    [0x53] = { gen_helper_rcpps_256, NULL },
+    [0x54] = { gen_helper_pand_256, gen_helper_pand_256 }, /* andps, andpd */
+    [0x55] = { gen_helper_pandn_256, gen_helper_pandn_256 }, /* andnps, andnpd */
+    [0x56] = { gen_helper_por_256, gen_helper_por_256 }, /* orps, orpd */
+    [0x57] = { gen_helper_pxor_256, gen_helper_pxor_256 }, /* xorps, xorpd */
+    [0x58] = AVX256_FOP(add),
+    [0x59] = AVX256_FOP(mul),
+    [0x5a] = { gen_helper_cvtps2pd_256, gen_helper_cvtpd2ps_256 }
+    [0x5b] = { gen_helper_cvtdq2ps_256, gen_helper_cvtps2dq_256 },
+    [0x5c] = AVX256_FOP(sub),
+    [0x5d] = AVX256_FOP(min),
+    [0x5e] = AVX256_FOP(div),
+    [0x5f] = AVX256_FOP(max),
+    [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
+    [0x7c] = { gen_helper_haddpd_256, gen_helper_haddps_256 },
+    [0x7d] = { gen_helper_hsubpd_256, gen_helper_hsubps_256 },
+    // XXX CMP??
+    [0xc6] = { gen_helper_shufps_256, gen_helper_shufpd_256 },
+    [0xd0] = { gen_helper_addsubpd_256, gen_helper_addsubps_256 },
+    // XXX third entry? check
+    [0xe6] = { gen_helper_cvttpd2dq_256, gen_helper_cvtdq2pd_256, gen_helper_cvtpd2dq_256 },
+    // XXX check encoding
+    [0xf0] = { SSE_SPECIAL }, /* lddqu */
+#endif
+};
+
 static void *sse_op_table2[3 * 8][2] = {
     [0 + 2] = MMX_OP2(psrlw),
     [0 + 4] = MMX_OP2(psraw),
@@ -2938,6 +2981,7 @@ static void *sse_op_table2[3 * 8][2] = {
     [16 + 7] = { NULL, gen_helper_pslldq_xmm },
 };
 
+// need AVX
 static void *sse_op_table3[4 * 3] = {
     gen_helper_cvtsi2ss,
     gen_helper_cvtsi2sd,
@@ -2955,6 +2999,7 @@ static void *sse_op_table3[4 * 3] = {
     X86_64_ONLY(gen_helper_cvtsd2sq),
 };
 
+// need AVX
 static void *sse_op_table4[8][4] = {
     SSE_FOP(cmpeq),
     SSE_FOP(cmplt),
@@ -2994,16 +3039,21 @@ static void *sse_op_table5[256] = {
 };
 
 struct sse_op_helper_s {
-    void *op[2]; 
+    void *op[3]; 
     uint32_t ext_mask;
-    uint32_t flags;
+    unsigned avx256 : 1;
 };
-#define SSSE3_OP(x) { MMX_OP2(x), CPUID_EXT_SSSE3 }
-#define SSE41_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE41 }
-#define SSE42_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE42 }
-#define SSE41_SPECIAL { { NULL, SSE_SPECIAL }, CPUID_EXT_SSE41 }
-#define AVX128_OP(x, c) { NULL, gen_helper_ ## x ## _avx128 }, CPUID_EXT_##c|CPUID_EXT_AVX }
-#define AVX256_OP(x, c) { NULL, gen_helper_ ## x ## _avx128 }, CPUID_EXT_##c|CPUID_EXT_AVX }
+#define MMX_OP3(x) \
+    { gen_helper_ ## x ## _mmx, gen_helper_ ## x ## _xmm, /* gen_helper_ ## x ## _avx */ }
+#define AVX_OP3(x) { NULL, gen_helper_ ## x ## _xmm, /* gen_helper_ ## xx ## _avx */ }
+
+#define SSSE3_OP(x) { MMX_OP3(x), CPUID_EXT_SSSE3, 0 }
+#define SSE41_OP(x) { AVX_OP3(x), CPUID_EXT_SSE41, 0 }
+#define SSE41_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE41, 1 }
+#define SSE42_OP(x) { AVX_OP3(x), CPUID_EXT_SSE42, 0 }
+#define SSE42_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE42, 1 }
+#define SSE41_SPECIAL { { NULL, SSE_SPECIAL, SSE_SPECIAL }, CPUID_EXT_SSE41, 0 }
+#define AVX256_OP(x)  { AVX_OP3(x), CPUID_EXT_AVX, 1 }
 
 /* 0f 38 */
 static struct sse_op_helper_s sse_op_table6[256] = {
@@ -3055,6 +3105,10 @@ static struct sse_op_helper_s sse_op_table6[256] = {
     [0x41] = SSE41_OP(phminposuw),
 };
 
+static struct sse_op_helper_s sse_op_table6_256[256] = {
+    // XXX
+};
+
 /* 0f 3a */
 static struct sse_op_helper_s sse_op_table7[256] = {
     [0x08] = SSE41_OP(roundps),
@@ -3081,6 +3135,10 @@ static struct sse_op_helper_s sse_op_table7[256] = {
     [0x63] = SSE42_OP(pcmpistri),
 };
 
+static struct sse_op_helper_s sse_op_table7_256[256] = {
+    // XXX
+};
+
 static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
 {
     /* simple MMX/SSE operation */
@@ -3095,8 +3153,7 @@ static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
     return 0;
 }
 
-
-static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r)
+static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr;
     unsigned modrm, rm, reg, mod;
@@ -3109,7 +3166,12 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r)
     if (b1 >= 2)
 	return 1;
 
-    sse_op2 = sse_op_table6[b].op[b1];
+    if (l) { 
+	if (b1 >= 2) 
+	    return 1;
+	sse_op2 = sse_op_table6_256[b].op[b1];
+    } else
+	sse_op2 = sse_op_table6[b].op[b1];
     if (!sse_op2)
 	return 1;
     if (!(s->cpuid_ext_features & sse_op_table6[op].ext_mask))
@@ -3173,7 +3235,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r)
     return 0;
 }
 
-static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r)
+static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr, ot, val;
     unsigned modrm, rm, reg, mod;
@@ -3187,7 +3249,12 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r)
 	return 1;
     }
 
-    sse_op2 = sse_op_table7[b].op[b1];
+    if (l) {
+	if (b1 >= 2)
+	    return 1;
+	sse_op2 = sse_op_table7_256[b].op[b1];
+    } else
+	sse_op2 = sse_op_table7[b].op[b1];
     if (!sse_op2)
 	return 1;
     if (!(s->cpuid_ext_features & sse_op_table7[op].ext_mask))
@@ -3913,7 +3980,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             if (s->prefix & PREFIX_REPNZ)
                 goto crc32;
         case 0x038:
-	    if (gen_sse_op38(s, modrm, b1, rex_r))
+	    if (gen_sse_op38(s, modrm, b1, rex_r, 0))
 		goto illegal_op;
             break;
         case 0x338: /* crc32 */
@@ -3924,6 +3991,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 
             if (b != 0xf0 && b != 0xf1)
                 goto illegal_op;
+	    if (s->prefix & PREFIX_VEX)
+		goto illegal_op;
             if (!(s->cpuid_ext_features & CPUID_EXT_SSE42))
                 goto illegal_op;
 
@@ -3948,7 +4017,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x03a:
         case 0x13a:
-	    if (gen_sse_op3a(s, modrm, b1, rex_r))
+	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0))
 		goto illegal_op;
 	    break;
         default:
@@ -4129,6 +4198,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     unsigned b2, mm, pp;
     int rex_r, op;
     void *sse_op2;
+    int l;
 
     if (!(s->cpuid_ext_features & CPUID_EXT_AVX))
 	return 1;
@@ -4148,10 +4218,13 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	mm = b1 & 0x1f;
 	if (b2 & 0x80) 
 	    s->dflag = 2;
+	l = b2 & 0x4;
     } else { /* 2 byte */
 	pp = b1 & 3;
 	mm = 1;
+	l = b1 & 0x4;
     }
+    s->prefix |= PREFIX_VEX;
 
     // TODO:
     // L: 256bit 
@@ -4164,14 +4237,19 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     op = ldub_code(s->pc++);    
     switch (mm) { 
     case 1:
-	sse_op2 = sse_op_table1[op][pp];
+	if (l) { /* 256bit */
+	    if (pp >= 2) 
+		return 1;
+	    sse_op2 = sse_op_table1_256[op][pp];
+	} else
+	    sse_op2 = sse_op_table1[op][pp];
 	if (!sse_op2)
 	    return 1;
 	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp);
     case 2:
-	return gen_sse_op38(s, op, pp, rex_r); 
+	return gen_sse_op38(s, op, pp, rex_r, l); 
     case 3:
-	return gen_sse_op3a(s, op, pp, rex_r);
+	return gen_sse_op3a(s, op, pp, rex_r, l);
     }
     return 1;
 }
@@ -4242,7 +4320,6 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
             prefixes |= PREFIX_ADR;
             goto next_byte;
         case 0x40 ... 0x4f:
-	    prefixes |= PREFIX_REX;
             /* REX prefix */
             rex_w = (b >> 3) & 1;
             rex_r = (b & 0x4) << 1;
@@ -7706,7 +7783,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         gen_eob(s);
         break;
     case 0x1b8: /* SSE4.2 popcnt */
-        if ((prefixes & (PREFIX_REPZ | PREFIX_LOCK | PREFIX_REPNZ)) !=
+        if ((prefixes & (PREFIX_REPZ | PREFIX_LOCK | PREFIX_REPNZ | PREFIX_VEX)) !=
              PREFIX_REPZ)
             goto illegal_op;
         if (!(s->cpuid_ext_features & CPUID_EXT_POPCNT))
