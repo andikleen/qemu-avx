@@ -4139,13 +4139,14 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	b2 = ldub_code(s->pc++);
 	pp = b2 & 3;
 	mm = b1 & 0x1f;
+	if (b2 & 0x80) 
+	    s->dflag = 2;
     } else { /* 2 byte */
 	pp = b1 & 3;
 	mm = 1;
     }
 
     // TODO:
-    // W: rex operand width
     // L: 256bit 
     // vvvv: additional register 
 
@@ -5429,7 +5430,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
 
 	    /* XXX I think address-size override is broken for SSE in
 	       general, but should be supported. The others are illegal. */
-	    if (prefixes)
+	    if (prefixes & ~PREFIX_ADR)
 		goto illegal_op;
 	    if (gen_vex(s, b, b1, prefixes))
 		goto illegal_op;    
