@@ -36,6 +36,7 @@
 #define PREFIX_LOCK   0x04
 #define PREFIX_DATA   0x08
 #define PREFIX_ADR    0x10
+#define PREFIX_REX    0x20
 
 #ifdef TARGET_X86_64
 #define X86_64_ONLY(x) x
@@ -4071,6 +4072,33 @@ static void gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
     }
 }
 
+/* Generate AVX code */
+static int gen_vex(DisasContext *s, int b, target_ulong pc_start)
+{
+    unsigned b1, b2, m, v;
+    int rex_w, rex_r;
+    rex_w = -1;
+    rex_r = 0;
+    
+    if (prefixes & ~PREFIX_ADR)
+	return 1;
+    b1 = ldup_code(s->pc);
+    s->pc++;
+    prefixes |= PREFIX_REX;
+    rex_r = ((~b1 & 0x80) >> 3);
+    if (b == 0xc5) { /* 3 byte */
+	s->rex_x = ((~b1 & 0x40) >> 3);
+	REX_B(s) = ((~b1 & 0x20) >> 1);
+	b2 = ldup_code(s->pc);
+	s->pc++;
+	rex_w = (~b2 >> 7);
+    } else {
+	s->rex_x = 0;
+	REX_B(s) = 0;
+	rex_w = 0;
+    }
+}
+
 /* convert one instruction. s->is_jmp is set if the translation must
    be stopped. Return the next pc value */
 static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
@@ -4137,6 +4165,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
             prefixes |= PREFIX_ADR;
             goto next_byte;
         case 0x40 ... 0x4f:
+	    prefixes |= PREFIX_REX;
             /* REX prefix */
             rex_w = (b >> 3) & 1;
             rex_r = (b & 0x4) << 1;
@@ -7626,6 +7655,13 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
     case 0x1d0 ... 0x1fe:
         gen_sse(s, b, pc_start, rex_r);
         break;
+
+    case 0xc5:
+    case 0xc4: 
+	if (gen_vex(s, b, prefixes))
+	    goto illegal_op;
+	break;
+
     default:
         goto illegal_op;
     }
