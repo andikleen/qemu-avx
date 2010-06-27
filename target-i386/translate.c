@@ -2769,7 +2769,37 @@ static inline void gen_op_movo(int d_offset, int s_offset)
     tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, d_offset + 8);
 }
 
-static inline void gen_op_mov32(int d_offset, int s_offset)
+/* 256 bit versions */
+
+static inline void gen_ldy_env_A0(int idx, int offset)
+{
+    int i;
+    int mem_index = (idx >> 2) - 1;
+
+    tcg_gen_qemu_ld64(cpu_tmp1_i64, cpu_A0, mem_index);
+    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset + offsetof(XMMReg, XMM_Q(0)));
+    for (i = 1; i < 4; i++) { 
+	tcg_gen_addi_tl(cpu_tmp0, cpu_A0, 8);
+	tcg_gen_qemu_ld64(cpu_tmp1_i64, cpu_tmp0, mem_index);
+	tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset + offsetof(XMMReg, XMM_Q(i)));
+    }
+}
+
+static inline void gen_sty_env_A0(int idx, int offset)
+{
+    int i;
+    int mem_index = (idx >> 2) - 1;
+
+    tcg_gen_ld_i64(cpu_tmp1_i64, cpu_env, offset + offsetof(XMMReg, XMM_Q(0)));
+    tcg_gen_qemu_st64(cpu_tmp1_i64, cpu_A0, mem_index);
+    for (i = 1; i < 4; i++) { 
+	tcg_gen_addi_tl(cpu_tmp0, cpu_A0, 8);
+	tcg_gen_ld_i64(cpu_tmp1_i64, cpu_env, offset + offsetof(XMMReg, XMM_Q(i)));
+	tcg_gen_qemu_st64(cpu_tmp1_i64, cpu_tmp0, mem_index);
+    }
+}
+
+static inline void gen_op_movy(int d_offset, int s_offset)
 {
     int i;
     for (i = 0; i < 4; i++) { 
@@ -2778,10 +2808,53 @@ static inline void gen_op_mov32(int d_offset, int s_offset)
     }
 }
 
-static inline void gen_op_avx_clearup(int offset)
+/* generic versions for xmm/vex128/vex256 */
+
+enum ssemode { MMX, XMM, VEX128, VEX256 }; /* order matters */
+
+static inline void gen_avx_clearup(int offset)
 {
     tcg_gen_movi_i64(cpu_tmp1_i64, 0);
     tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset);
+}
+
+static inline void gen_xmm_clearup(int offset)
+{
+    tcg_gen_movi_i32(cpu_tmp2_i32, 0);
+    tcg_gen_st_i32(cpu_tmp2_i32, cpu_env, offset);
+}
+
+static inline void gen_avx_clearup_mode(enum ssemode mode, int offset)
+{
+    if (mode == VEX128)
+	gen_avx_clearup(offset);
+}
+
+static inline void gen_st_env_A0_mode(enum ssemode mode, int idx, int offset)
+{
+    if (mode == VEX256)
+	gen_sty_env_A0(idx, offset);
+    else
+	gen_sto_env_A0(idx, offset);
+    gen_avx_clearup_mode(mode, offset);
+}
+
+static inline void gen_ld_env_A0_mode(enum ssemode mode, int idx, int offset)
+{
+    if (mode == VEX256)
+	gen_ldy_env_A0(idx, offset);
+    else
+	gen_ldo_env_A0(idx, offset);
+    gen_avx_clearup_mode(mode, offset);
+}
+
+static inline void gen_op_mov_mode(enum ssemode mode, int d_offset, int s_offset)
+{
+    if (mode == VEX256)
+	gen_op_movy(d_offset, s_offset);
+    else
+	gen_op_movo(d_offset, s_offset);
+    gen_avx_clearup_mode(mode, d_offset);    
 }
 
 static inline void gen_op_movq(int d_offset, int s_offset)
@@ -2945,12 +3018,10 @@ static void *sse_op_table1[256][4] = {
       gen_helper_ ## x ## ss_avx, gen_helper_ ## x ## sd_avx, }
 
 static void *sse_op_table1_avx[256][4] = {
-#if 0
     [0x10] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
     [0x11] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
     [0x12] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
-#endif
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
     [0x5c] = AVX128_FOP(sub),
@@ -2963,11 +3034,11 @@ static void *sse_op_table1_avx[256][4] = {
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
 
 static void *sse_op_table1_256[256][2] = {
-#if 0
     [0x10] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x11] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x12] = { SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+#if 0
     [0x14] = { gen_helper_punpckldq_256, gen_helper_punpcklqdq_256 },
     [0x15] = { gen_helper_punpckhdq_256, gen_helper_punpckhqdq_256 },
     [0x16] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
@@ -3470,10 +3541,13 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
     return 0;
 }
 
-enum ssemode { MMX, XMM, VEX };
+static inline int has_vreg(enum ssemode mode, int v)
+{
+    return (mode >= VEX128 && v != 0xf);
+}
 
 static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse_op2,
-		       enum ssemode mode, int b1, int l, int v)
+		       enum ssemode mode, int b1, int v)
 {
     int op1_offset, op2_offset, val, ot;
     int modrm, mod, rm, reg, reg_addr, offset_addr;
@@ -3499,13 +3573,13 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             if (mod == 3)
                 goto illegal_op;
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-            gen_sto_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+            gen_st_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x3f0: /* lddqu */
             if (mod == 3)
                 goto illegal_op;
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-            gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+            gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x22b: /* movntss */
         case 0x32b: /* movntsd */
@@ -3573,11 +3647,11 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x26f: /* movdqu xmm, ea */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+                gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
-                gen_op_movo(offsetof(CPUX86State,xmm_regs[reg]),
-                            offsetof(CPUX86State,xmm_regs[rm]));
+		gen_op_mov_mode(mode, offsetof(CPUX86State,xmm_regs[reg]),
+				offsetof(CPUX86State,xmm_regs[rm]));
             }
             break;
         case 0x210: /* movss xmm, ea */
@@ -3621,20 +3695,35 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             break;
         case 0x212: /* movsldup */
+	    if (has_vreg(mode, v))
+		return 1;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+                gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(0)));
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(2)));
+		if (mode == VEX256) { 
+		    gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(4)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_L(4)));
+		    gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(6)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_L(6)));
+		} 
             }
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)));
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)));
+	    if (mode == VEX256) {
+		gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(5)),
+			    offsetof(CPUX86State,xmm_regs[reg].XMM_L(4)));
+		gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(7)),
+			    offsetof(CPUX86State,xmm_regs[reg].XMM_L(6)));
+	    }	
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x312: /* movddup */
             if (mod != 3) {
@@ -3752,11 +3841,12 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x27f: /* movdqu ea, xmm */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_sto_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+                gen_st_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
-                gen_op_movo(offsetof(CPUX86State,xmm_regs[rm]),
-                            offsetof(CPUX86State,xmm_regs[reg]));
+                gen_op_mov_mode(mode, 
+				 offsetof(CPUX86State,xmm_regs[rm]),
+				 offsetof(CPUX86State,xmm_regs[reg]));
             }
             break;
         case 0x211: /* movss ea, xmm */
@@ -3768,23 +3858,27 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[rm].XMM_L(0)),
                             offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)));
+		gen_xmm_clearup(offsetof(CPUX86State,xmm_regs[rm]));
+		gen_avx_clearup(offsetof(CPUX86State,xmm_regs[rm]));
             }
             break;
         case 0x311: /* movsd ea, xmm */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_stq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+                gen_st_env_A0_mode(mode,s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[rm]));
             }
             break;
         case 0x013: /* movlps */
         case 0x113: /* movlpd */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_stq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+                gen_st_env_A0_mode(mode, s->mem_index, 
+				   offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
             } else {
                 goto illegal_op;
             }
@@ -3793,7 +3887,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x117: /* movhpd */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_stq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)));
+                gen_st_env_A0_mode(mode, s->mem_index, 
+				   offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)));
             } else {
                 goto illegal_op;
             }
@@ -3877,6 +3972,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x22a: /* cvtsi2ss */
         case 0x32a: /* cvtsi2sd */
+	    if (has_vreg(mode, v))
+		return 1;
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
             gen_ldst_modrm(s, modrm, ot, OR_TMP0, 0);
             op1_offset = offsetof(CPUX86State,xmm_regs[reg]);
@@ -3888,6 +3985,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             } else {
                 ((void (*)(TCGv_ptr, TCGv))sse_op2)(cpu_ptr0, cpu_T[0]);
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x02c: /* cvttps2pi */
         case 0x12c: /* cvttpd2pi */
@@ -3924,6 +4022,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x32c: /* cvttsd2si */
         case 0x22d: /* cvtss2si */
         case 0x32d: /* cvtsd2si */
+	    if (has_vreg(mode, v))
+		return 1;
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
@@ -3951,6 +4051,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0xc4: /* pinsrw */
         case 0x1c4:
+	    if (has_vreg(mode, v))
+		return 1;
             s->rip_offset = 1;
             gen_ldst_modrm(s, modrm, OT_WORD, OR_TMP0, 0);
             val = ldub_code(s->pc++);
@@ -3963,9 +4065,12 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 tcg_gen_st16_tl(cpu_T[0], cpu_env,
                                 offsetof(CPUX86State,fpregs[reg].mmx.MMX_W(val)));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0xc5: /* pextrw */
         case 0x1c5:
+	    if (has_vreg(mode, v))
+		return 1;
             if (mod != 3)
                 goto illegal_op;
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
@@ -3985,6 +4090,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             gen_op_mov_reg_T0(ot, reg);
             break;
         case 0x1d6: /* movq ea, xmm */
+	    if (has_vreg(mode, v))
+		return 1;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_stq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
@@ -4242,7 +4349,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
         gen_helper_enter_mmx();
     }
 
-    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, mode, b1, 0, -1);
+    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, mode, b1, 0);
 }
 
 /* Handle AVX with VEX prefixes */
@@ -4252,6 +4359,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     int rex_r, op;
     void *sse_op2;
     int l;
+    enum ssemode mode;
 
     if (!(s->cpuid_ext_features & CPUID_EXT_AVX))
 	return 1;
@@ -4291,8 +4399,10 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	if (l) { /* 256bit */
 	    if (pp >= 2) 
 		return 1;
+	    mode = VEX256;
 	    sse_op2 = sse_op_table1_256[op][pp];
 	} else {
+	    mode = VEX128;
 	    sse_op2 = sse_op_table1_avx[op][pp];
 	}
 	if (!sse_op2) {
@@ -4306,7 +4416,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	    }
 	    return 1;
 	}
-	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, VEX, pp, l, v);
+	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, mode, pp, v);
     case 2: /* 0f 38 */
 	if (pp >= 2)
 	    return 1;
