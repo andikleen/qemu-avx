@@ -2930,6 +2930,12 @@ static void *sse_op_table1[256][4] = {
       gen_helper_ ## x ## ss_avx, gen_helper_ ## x ## sd_avx, }
 
 static void *sse_op_table1_avx[256][4] = {
+#if 0
+    [0x10] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
+    [0x11] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
+    [0x12] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
+    [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+#endif
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
     [0x5c] = AVX128_FOP(sub),
@@ -4049,7 +4055,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    sse_op2 = sse_op_table7[b & 0xff].op[b1];
 	    if (!(s->cpuid_ext_features & sse_op_table7[b & 0xff].ext_mask))
 		return 1;
-	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0, -1, NULL))
+	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0, -1, sse_op2))
 		goto illegal_op;
 	    break;
         default:
@@ -4252,7 +4258,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	l = b2 & 0x4;
 	v = ~((b2 >> 3) & 0xf);
     } else { /* 2 byte */
-	pp = b1 & 3;
+	pp = b1 & 3; /* 0: none, 1: 66, 2: f3, 3: f2 */
 	mm = 1;
 	l = b1 & 0x4;
 	v = ~((b1 >> 3) & 0xf);
@@ -4264,27 +4270,28 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 
     op = ldub_code(s->pc++);    
 
-    if (op == 0x77) {
-	/* VZEROUPPER/VZEROALL */
-	if (l)
-	    CODE64(s) ? gen_helper_vzeroall_64() : gen_helper_vzeroall_32();
-	else
-	    CODE64(s) ? gen_helper_vzeroupper_64() : gen_helper_vzeroupper_32();
-	return 0;
-    }
-
     switch (mm) { 
-    case 1:
+    case 1: 
 	if (l) { /* 256bit */
 	    if (pp >= 2) 
 		return 1;
 	    sse_op2 = sse_op_table1_256[op][pp];
-	} else
+	} else {
 	    sse_op2 = sse_op_table1_avx[op][pp];
-	if (!sse_op2)
+	}
+	if (!sse_op2) {
+	    if (pp == 0 && op == 0x77) {
+		/* VZEROUPPER/VZEROALL */
+		if (l)
+		    CODE64(s) ? gen_helper_vzeroall_64() : gen_helper_vzeroall_32();
+		else
+		    CODE64(s) ? gen_helper_vzeroupper_64() : gen_helper_vzeroupper_32();
+		return 0;
+	    }
 	    return 1;
+	}
 	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp, l, v);
-    case 2:
+    case 2: /* 0f 38 */
 	if (pp >= 2)
 	    return 1;
 	if (l) 
@@ -4292,7 +4299,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	else
 	    sse_op2 = sse_op_table7_avx[op][pp];
 	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2); 
-    case 3:
+    case 3: /* 0f 3a */
 	if (pp >= 2)
 	    return 1;
 	if (l) 
@@ -4300,8 +4307,9 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	else
 	    sse_op2 = sse_op_table6_avx[op][pp];
 	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2);
+    default:
+	return 1;
     }
-    return 1;
 }
 
 /* convert one instruction. s->is_jmp is set if the translation must

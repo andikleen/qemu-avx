@@ -1172,7 +1172,6 @@ void glue(helper_packssdw, SUFFIX) (Reg *d, Reg *s)
 void glue(helper_punpck ## base_name ## bw, SUFFIX) (Reg *d, Reg *s)   \
 {                                                               \
     Reg r;                                              \
-                                                                \
     r.B(0) = d->B((base << (SHIFT + 2)) + 0);                   \
     r.B(1) = s->B((base << (SHIFT + 2)) + 0);                   \
     r.B(2) = d->B((base << (SHIFT + 2)) + 1);                   \
