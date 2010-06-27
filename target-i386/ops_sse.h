@@ -33,6 +33,12 @@
 #define L(n) XMM_L(n)
 #define Q(n) XMM_Q(n)
 #define SUFFIX _xmm
+
+static inline void avx_clear_upper(XMMReg *d)
+{
+	d->XMM_D(2) = 0;
+	d->XMM_D(3) = 0;
+}
 #endif
 
 void glue(helper_psrlw, SUFFIX)(Reg *d, Reg *s)

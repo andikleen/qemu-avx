@@ -5684,16 +5684,50 @@ void helper_emms(void)
     *(uint32_t *)(env->fptags + 4) = 0x01010101;
 }
 
+void helper_vzeroall_32(void)
+{
+    int i;
+    for (i = 0; i < 8; i++) {
+	env->xmm_regs[i].XMM_Q(0) = 0;
+	env->xmm_regs[i].XMM_Q(1) = 0;
+	env->xmm_regs[i].XMM_Q(2) = 0;
+	env->xmm_regs[i].XMM_Q(3) = 0;
+    }
+}
+
+void helper_vzeroall_64(void)
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+	env->xmm_regs[i].XMM_Q(0) = 0;
+	env->xmm_regs[i].XMM_Q(1) = 0;
+	env->xmm_regs[i].XMM_Q(2) = 0;
+	env->xmm_regs[i].XMM_Q(3) = 0;
+    }
+}
+
+void helper_vzeroupper_32(void)
+{
+    int i;
+    for (i = 0; i < 8; i++) {
+	env->xmm_regs[i].XMM_Q(2) = 0;
+	env->xmm_regs[i].XMM_Q(3) = 0;
+    }
+}
+
+void helper_vzeroupper_64(void)
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+	env->xmm_regs[i].XMM_Q(2) = 0;
+	env->xmm_regs[i].XMM_Q(3) = 0;
+    }    
+}
+
 /* XXX: suppress */
 void helper_movq(void *d, void *s)
 {
     *(uint64_t *)d = *(uint64_t *)s;
-}
-
-static inline void avx_clear_upper(XMMReg *d)
-{
-	d->XMM_D(2) = 0;
-	d->XMM_D(3) = 0;
 }
 
 #define SHIFT 0

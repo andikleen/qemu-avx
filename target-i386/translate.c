@@ -4264,6 +4264,16 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	return 0;
 
     op = ldub_code(s->pc++);    
+
+    if (op == 0x77) {
+	/* VZEROUPPER/VZEROALL */
+	if (l)
+	    CODE64(s) ? gen_helper_vzeroall_64() : gen_helper_vzeroall_32();
+	else
+	    CODE64(s) ? gen_helper_vzeroupper_64() : gen_helper_vzeroupper_32();
+	return 0;
+    }
+
     switch (mm) { 
     case 1:
 	if (l) { /* 256bit */

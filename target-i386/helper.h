@@ -200,6 +200,10 @@ DEF_HELPER_2(lzcnt, tl, tl, int)
 DEF_HELPER_1(ldmxcsr, void, i32)
 DEF_HELPER_0(enter_mmx, void)
 DEF_HELPER_0(emms, void)
+DEF_HELPER_0(vzeroupper_32, void)
+DEF_HELPER_0(vzeroupper_64, void)
+DEF_HELPER_0(vzeroall_32, void)
+DEF_HELPER_0(vzeroall_64, void)
 DEF_HELPER_2(movq, void, ptr, ptr)
 
 #define SHIFT 0
