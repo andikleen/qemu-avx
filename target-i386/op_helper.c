@@ -5690,6 +5690,12 @@ void helper_movq(void *d, void *s)
     *(uint64_t *)d = *(uint64_t *)s;
 }
 
+static inline void avx_clear_upper(XMMReg *d)
+{
+	d->XMM_D(2) = 0;
+	d->XMM_D(3) = 0;
+}
+
 #define SHIFT 0
 #include "ops_sse.h"
 

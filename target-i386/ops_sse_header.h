@@ -137,7 +137,14 @@ DEF_HELPER_3(glue(pshufhw, SUFFIX), void, Reg, Reg, int)
     DEF_HELPER_2(name ## ps , void, Reg, Reg)        \
     DEF_HELPER_2(name ## ss , void, Reg, Reg)        \
     DEF_HELPER_2(name ## pd , void, Reg, Reg)        \
-    DEF_HELPER_2(name ## sd , void, Reg, Reg)
+    DEF_HELPER_2(name ## sd , void, Reg, Reg)	     \
+    DEF_HELPER_3(name ## ps_avx , void, Reg, Reg, Reg)	 \
+    DEF_HELPER_3(name ## ps_256 , void, Reg, Reg, Reg)	 \
+    DEF_HELPER_3(name ## ss_avx , void, Reg, Reg, Reg)	 \
+    DEF_HELPER_3(name ## pd_avx , void, Reg, Reg, Reg)	 \
+    DEF_HELPER_3(name ## pd_256 , void, Reg, Reg, Reg)	 \
+    DEF_HELPER_3(name ## sd_avx , void, Reg, Reg, Reg)   \
+
 
 SSE_HELPER_S(add, FPU_ADD)
 SSE_HELPER_S(sub, FPU_SUB)

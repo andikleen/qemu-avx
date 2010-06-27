@@ -67,7 +67,7 @@ static TCGv cpu_regs[CPU_NB_REGS];
 static TCGv cpu_T[2], cpu_T3;
 /* local register indexes (only used inside old micro ops) */
 static TCGv cpu_tmp0, cpu_tmp4;
-static TCGv_ptr cpu_ptr0, cpu_ptr1;
+static TCGv_ptr cpu_ptr0, cpu_ptr1, cpu_ptr2;
 static TCGv_i32 cpu_tmp2_i32, cpu_tmp3_i32;
 static TCGv_i64 cpu_tmp1_i64;
 static TCGv cpu_tmp5;
@@ -2925,6 +2925,20 @@ static void *sse_op_table1[256][4] = {
     [0xfe] = MMX_OP2(paddl),
 };
 
+#define AVX128_FOP(x) \
+    { gen_helper_ ## x ## ps_avx, gen_helper_ ## x ## pd_avx,\
+      gen_helper_ ## x ## ss_avx, gen_helper_ ## x ## sd_avx, }
+
+static void *sse_op_table1_avx[256][4] = {
+    [0x58] = AVX128_FOP(add),
+    [0x59] = AVX128_FOP(mul),
+    [0x5c] = AVX128_FOP(sub),
+    [0x5d] = AVX128_FOP(min),
+    [0x5e] = AVX128_FOP(div),
+    [0x5f] = AVX128_FOP(max),
+    // XXX add more as ops_sse is updated
+};
+
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
 
 static void *sse_op_table1_256[256][2] = {
@@ -2940,21 +2954,27 @@ static void *sse_op_table1_256[256][2] = {
     [0x28] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
     [0x29] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
     [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */
+#endif
     [0x51] = AVX256_FOP(sqrt),
+#if 0
     [0x52] = { gen_helper_rsqrtps_256, NULL },
     [0x53] = { gen_helper_rcpps_256, NULL },
     [0x54] = { gen_helper_pand_256, gen_helper_pand_256 }, /* andps, andpd */
     [0x55] = { gen_helper_pandn_256, gen_helper_pandn_256 }, /* andnps, andnpd */
     [0x56] = { gen_helper_por_256, gen_helper_por_256 }, /* orps, orpd */
     [0x57] = { gen_helper_pxor_256, gen_helper_pxor_256 }, /* xorps, xorpd */
+#endif
     [0x58] = AVX256_FOP(add),
     [0x59] = AVX256_FOP(mul),
+#if 0
     [0x5a] = { gen_helper_cvtps2pd_256, gen_helper_cvtpd2ps_256 }
     [0x5b] = { gen_helper_cvtdq2ps_256, gen_helper_cvtps2dq_256 },
+#endif
     [0x5c] = AVX256_FOP(sub),
     [0x5d] = AVX256_FOP(min),
     [0x5e] = AVX256_FOP(div),
     [0x5f] = AVX256_FOP(max),
+#if 0
     [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
     [0x7c] = { gen_helper_haddpd_256, gen_helper_haddps_256 },
     [0x7d] = { gen_helper_hsubpd_256, gen_helper_hsubps_256 },
@@ -3105,7 +3125,13 @@ static struct sse_op_helper_s sse_op_table6[256] = {
     [0x41] = SSE41_OP(phminposuw),
 };
 
-static struct sse_op_helper_s sse_op_table6_256[256] = {
+static void *sse_op_table6_avx[256][2] = {
+    // or 4?
+    // XXX
+};
+
+
+static void *sse_op_table6_256[256][2] = {
     // XXX
 };
 
@@ -3135,7 +3161,11 @@ static struct sse_op_helper_s sse_op_table7[256] = {
     [0x63] = SSE42_OP(pcmpistri),
 };
 
-static struct sse_op_helper_s sse_op_table7_256[256] = {
+static void *sse_op_table7_avx[256][2] = {
+    // XXX
+};
+
+static void *sse_op_table7_256[256][2] = {
     // XXX
 };
 
@@ -3153,11 +3183,10 @@ static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
     return 0;
 }
 
-static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l)
+static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, int v, void *sse_op2)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr;
     unsigned modrm, rm, reg, mod;
-    void *sse_op2;
 
     modrm = ldub_code(s->pc++);
     rm = modrm & 7;
@@ -3166,15 +3195,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l)
     if (b1 >= 2)
 	return 1;
 
-    if (l) { 
-	if (b1 >= 2) 
-	    return 1;
-	sse_op2 = sse_op_table6_256[b].op[b1];
-    } else
-	sse_op2 = sse_op_table6[b].op[b1];
     if (!sse_op2)
-	return 1;
-    if (!(s->cpuid_ext_features & sse_op_table6[op].ext_mask))
 	return 1;
 
     if (b1) {
@@ -3221,13 +3242,20 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l)
 	    gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
 	    gen_ldq_env_A0(s->mem_index, op2_offset);
 	}
+	if (v != -1)
+	    return 1;
     }
     if (sse_op2 == SSE_SPECIAL)
 	return 1;
 
     tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
     tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-    ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+    if (v != -1) {
+	tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State, xmm_regs[v]));
+	((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr2, cpu_ptr1);
+    } else {
+	((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+    }
 
     if (op == 0x17)
 	s->cc_op = CC_OP_EFLAGS;
@@ -3235,11 +3263,10 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l)
     return 0;
 }
 
-static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l)
+static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v, void *sse_op2)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr, ot, val;
     unsigned modrm, rm, reg, mod;
-    void *sse_op2;
 
     modrm = ldub_code(s->pc++);
     rm = modrm & 7;
@@ -3249,15 +3276,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l)
 	return 1;
     }
 
-    if (l) {
-	if (b1 >= 2)
-	    return 1;
-	sse_op2 = sse_op_table7_256[b].op[b1];
-    } else
-	sse_op2 = sse_op_table7[b].op[b1];
     if (!sse_op2)
-	return 1;
-    if (!(s->cpuid_ext_features & sse_op_table7[op].ext_mask))
 	return 1;
 
     if (sse_op2 == SSE_SPECIAL) {
@@ -3420,16 +3439,23 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l)
 
     tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
     tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-    ((void (*)(TCGv_ptr, TCGv_ptr, TCGv_i32))sse_op2)(cpu_ptr0, cpu_ptr1, tcg_const_i32(val));
+    if (v != -1) {
+	tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State, xmm_regs[v]));
+	((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr, TCGv_i32))sse_op2)
+	    (cpu_ptr0, cpu_ptr2, cpu_ptr1, tcg_const_i32(val));
+    } else {
+	((void (*)(TCGv_ptr, TCGv_ptr, TCGv_i32))sse_op2)(cpu_ptr0, cpu_ptr1, tcg_const_i32(val));
+    }
     return 0;
 }
 
 static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse_op2,
-		       int is_xmm, int b1)
+		       int is_xmm, int b1, int l, int v)
 {
     int op1_offset, op2_offset, val, ot;
     int modrm, mod, rm, reg, reg_addr, offset_addr;
 
+    // XXX use v
     modrm = ldub_code(s->pc++);
     reg = ((modrm >> 3) & 7);
     if (is_xmm)
@@ -3979,8 +4005,11 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x138:
             if (s->prefix & PREFIX_REPNZ)
                 goto crc32;
-        case 0x038:
-	    if (gen_sse_op38(s, modrm, b1, rex_r, 0))
+        case 0x038: 
+	    sse_op2 = sse_op_table6[b & 0xff].op[b1];
+	    if (!(s->cpuid_ext_features & sse_op_table6[b & 0xff].ext_mask))
+		return 1;
+	    if (gen_sse_op38(s, modrm, b1, rex_r, 0, -1, NULL))
 		goto illegal_op;
             break;
         case 0x338: /* crc32 */
@@ -4017,7 +4046,10 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x03a:
         case 0x13a:
-	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0))
+	    sse_op2 = sse_op_table7[b & 0xff].op[b1];
+	    if (!(s->cpuid_ext_features & sse_op_table7[b & 0xff].ext_mask))
+		return 1;
+	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0, -1, NULL))
 		goto illegal_op;
 	    break;
         default:
@@ -4120,7 +4152,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         default:
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-            ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+	    ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
             break;
         }
         if (b == 0x2e || b == 0x2f) {
@@ -4189,13 +4221,13 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
         gen_helper_enter_mmx();
     }
 
-    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, is_xmm, b1);
+    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, is_xmm, b1, 0, -1);
 }
 
 /* Handle AVX with VEX prefixes */
 static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 {
-    unsigned b2, mm, pp;
+    unsigned b2, mm, pp, v;
     int rex_r, op;
     void *sse_op2;
     int l;
@@ -4219,17 +4251,14 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	if (b2 & 0x80) 
 	    s->dflag = 2;
 	l = b2 & 0x4;
+	v = ~((b2 >> 3) & 0xf);
     } else { /* 2 byte */
 	pp = b1 & 3;
 	mm = 1;
 	l = b1 & 0x4;
+	v = ~((b1 >> 3) & 0xf);
     }
     s->prefix |= PREFIX_VEX;
-
-    // TODO:
-    // L: 256bit 
-    // vvvv: additional register 
-    // upper half clear semantics
 
     if (pre_sse_checks(s, pc_start))
 	return 0;
@@ -4242,14 +4271,26 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 		return 1;
 	    sse_op2 = sse_op_table1_256[op][pp];
 	} else
-	    sse_op2 = sse_op_table1[op][pp];
+	    sse_op2 = sse_op_table1_avx[op][pp];
 	if (!sse_op2)
 	    return 1;
-	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp);
+	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp, l, v);
     case 2:
-	return gen_sse_op38(s, op, pp, rex_r, l); 
+	if (pp >= 2)
+	    return 1;
+	if (l) 
+	    sse_op2 = sse_op_table7_avx[op][pp];
+	else
+	    sse_op2 = sse_op_table7_256[op][pp];
+	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2); 
     case 3:
-	return gen_sse_op3a(s, op, pp, rex_r, l);
+	if (pp >= 2)
+	    return 1;
+	if (l) 
+	    sse_op2 = sse_op_table6_avx[op][pp];
+	else
+	    sse_op2 = sse_op_table6_256[op][pp];
+	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2);
     }
     return 1;
 }
@@ -7983,6 +8024,7 @@ static inline void gen_intermediate_code_internal(CPUX86State *env,
     cpu_tmp5 = tcg_temp_new();
     cpu_ptr0 = tcg_temp_new_ptr();
     cpu_ptr1 = tcg_temp_new_ptr();
+    cpu_ptr2 = tcg_temp_new_ptr();
 
     gen_opc_end = gen_opc_buf + OPC_MAX_SIZE;
 

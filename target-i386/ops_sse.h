@@ -578,7 +578,50 @@ void helper_ ## name ## pd (Reg *d, Reg *s)\
 void helper_ ## name ## sd (Reg *d, Reg *s)\
 {\
     d->XMM_D(0) = F(64, d->XMM_D(0), s->XMM_D(0));\
+}\
+void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
+    d->XMM_S(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
+    d->XMM_S(2) = F(32, a->XMM_S(2), b->XMM_S(2));\
+    d->XMM_S(3) = F(32, a->XMM_S(3), b->XMM_S(3));\
+    avx_clear_upper(d);\
+}\
+void helper_ ## name ## ps_256 (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
+    d->XMM_S(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
+    d->XMM_S(2) = F(32, a->XMM_S(2), b->XMM_S(2));\
+    d->XMM_S(3) = F(32, a->XMM_S(3), b->XMM_S(3));\
+    d->XMM_S(4) = F(32, a->XMM_S(4), b->XMM_S(4));\
+    d->XMM_S(5) = F(32, a->XMM_S(5), b->XMM_S(5));\
+    d->XMM_S(6) = F(32, a->XMM_S(6), b->XMM_S(6));\
+    d->XMM_S(7) = F(32, a->XMM_S(7), b->XMM_S(7));\
+}\
+\
+void helper_ ## name ## ss_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
+}\
+void helper_ ## name ## pd_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
+    d->XMM_D(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
+    avx_clear_upper(d);\
+}\
+void helper_ ## name ## pd_256 (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
+    d->XMM_D(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
+    d->XMM_D(2) = F(64, a->XMM_D(2), b->XMM_D(2));\
+    d->XMM_D(3) = F(64, a->XMM_D(3), b->XMM_D(3));\
+}\
+\
+void helper_ ## name ## sd_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
 }
+
 
 #define FPU_ADD(size, a, b) float ## size ## _add(a, b, &env->sse_status)
 #define FPU_SUB(size, a, b) float ## size ## _sub(a, b, &env->sse_status)
