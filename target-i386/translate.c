@@ -4211,8 +4211,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
         return 0;
     }
     if (b == 0x77) {
-        /* emms */
-        gen_helper_emms();
+	gen_helper_emms();
         return 0;
     }
     /* prepare MMX state (XXX: optimize by storing fptt and fptags in
@@ -4289,17 +4288,17 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	if (pp >= 2)
 	    return 1;
 	if (l) 
-	    sse_op2 = sse_op_table7_avx[op][pp];
-	else
 	    sse_op2 = sse_op_table7_256[op][pp];
+	else
+	    sse_op2 = sse_op_table7_avx[op][pp];
 	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2); 
     case 3:
 	if (pp >= 2)
 	    return 1;
 	if (l) 
-	    sse_op2 = sse_op_table6_avx[op][pp];
-	else
 	    sse_op2 = sse_op_table6_256[op][pp];
+	else
+	    sse_op2 = sse_op_table6_avx[op][pp];
 	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2);
     }
     return 1;
