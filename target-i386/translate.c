@@ -2769,6 +2769,21 @@ static inline void gen_op_movo(int d_offset, int s_offset)
     tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, d_offset + 8);
 }
 
+static inline void gen_op_mov32(int d_offset, int s_offset)
+{
+    int i;
+    for (i = 0; i < 4; i++) { 
+	tcg_gen_ld_i64(cpu_tmp1_i64, cpu_env, s_offset + i*8);
+	tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, d_offset + i*8);
+    }
+}
+
+static inline void gen_op_avx_clearup(int offset)
+{
+    tcg_gen_movi_i64(cpu_tmp1_i64, 0);
+    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset);
+}
+
 static inline void gen_op_movq(int d_offset, int s_offset)
 {
     tcg_gen_ld_i64(cpu_tmp1_i64, cpu_env, s_offset);
@@ -3455,8 +3470,10 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
     return 0;
 }
 
+enum ssemode { MMX, XMM, VEX };
+
 static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse_op2,
-		       int is_xmm, int b1, int l, int v)
+		       enum ssemode mode, int b1, int l, int v)
 {
     int op1_offset, op2_offset, val, ot;
     int modrm, mod, rm, reg, reg_addr, offset_addr;
@@ -3464,7 +3481,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
     // XXX use v
     modrm = ldub_code(s->pc++);
     reg = ((modrm >> 3) & 7);
-    if (is_xmm)
+    if (mode >= XMM)
         reg |= rex_r;
     mod = (modrm >> 6) & 3;
     if (sse_op2 == SSE_SPECIAL) {
@@ -3791,7 +3808,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	        goto illegal_op;
             }
             val = ldub_code(s->pc++);
-            if (is_xmm) {
+            if (mode >= XMM) {
                 gen_op_movl_T0_im(val);
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,xmm_t0.XMM_L(0)));
                 gen_op_movl_T0_0();
@@ -3807,7 +3824,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             sse_op2 = sse_op_table2[((b - 1) & 3) * 8 + (((modrm >> 3)) & 7)][b1];
             if (!sse_op2)
                 goto illegal_op;
-            if (is_xmm) {
+            if (mode >= XMM) {
                 rm = (modrm & 7) | REX_B(s);
                 op2_offset = offsetof(CPUX86State,xmm_regs[rm]);
             } else {
@@ -4072,7 +4089,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         default:
             break;
         }
-        if (is_xmm) {
+        if (mode >= XMM) {
             op1_offset = offsetof(CPUX86State,xmm_regs[reg]);
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
@@ -4177,7 +4194,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
 {
     int b1;
     void *sse_op2;
-    int is_xmm;
+    enum ssemode mode;
 
     if (s->prefix & PREFIX_DATA)
         b1 = 1;
@@ -4196,17 +4213,16 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
     if (!sse_op2)
 	return 1;
     if ((b <= 0x5f && b >= 0x10) || b == 0xc6 || b == 0xc2) {
-        is_xmm = 1;
+        mode = XMM;
     } else {
         if (b1 == 0) {
-            /* MMX case */
-            is_xmm = 0;
+            mode = MMX;
         } else {
-            is_xmm = 1;
+            mode = XMM;
         }
     }
 
-    if (is_xmm && !(s->flags & HF_OSFXSR_MASK))
+    if ((mode == XMM) && !(s->flags & HF_OSFXSR_MASK))
         if ((b != 0x38 && b != 0x3a) || (s->prefix & PREFIX_DATA))
 	    return 1;
     if (b == 0x0e) {
@@ -4222,11 +4238,11 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
     }
     /* prepare MMX state (XXX: optimize by storing fptt and fptags in
        the static cpu state) */
-    if (!is_xmm) {
+    if (mode == MMX) {
         gen_helper_enter_mmx();
     }
 
-    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, is_xmm, b1, 0, -1);
+    return gen_sse_avx(s, b, pc_start, rex_r, sse_op2, mode, b1, 0, -1);
 }
 
 /* Handle AVX with VEX prefixes */
@@ -4290,7 +4306,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	    }
 	    return 1;
 	}
-	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, 1, pp, l, v);
+	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, VEX, pp, l, v);
     case 2: /* 0f 38 */
 	if (pp >= 2)
 	    return 1;
