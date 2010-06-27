@@ -825,7 +825,9 @@ static int kvm_put_fpu(CPUX86State *env)
         fpu.ftwx |= (!env->fptags[i]) << i;
     }
     memcpy(fpu.fpr, env->fpregs, sizeof env->fpregs);
-    memcpy(fpu.xmm, env->xmm_regs, sizeof env->xmm_regs);
+    /* XXX: need avx support and force disable */
+    for (i = 0; i < 16; i++)
+	    memcpy(&fpu.xmm[i], &env->xmm_regs[i], 16);
     fpu.mxcsr = env->mxcsr;
 
     return kvm_vcpu_ioctl(env, KVM_SET_FPU, &fpu);
@@ -1049,7 +1051,9 @@ static int kvm_get_fpu(CPUX86State *env)
         env->fptags[i] = !((fpu.ftwx >> i) & 1);
     }
     memcpy(env->fpregs, fpu.fpr, sizeof env->fpregs);
-    memcpy(env->xmm_regs, fpu.xmm, sizeof env->xmm_regs);
+    /* XXX */
+    for (i = 0; i < 16; i++)
+	    memcpy(&env->xmm_regs[i], &fpu.xmm[i], 16);
     env->mxcsr = fpu.mxcsr;
 
     return 0;
