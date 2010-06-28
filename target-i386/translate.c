@@ -3017,11 +3017,17 @@ static void *sse_op_table1[256][4] = {
     { gen_helper_ ## x ## ps_avx, gen_helper_ ## x ## pd_avx,\
       gen_helper_ ## x ## ss_avx, gen_helper_ ## x ## sd_avx, }
 
+#define SSE_SPECIAL4 { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }
+
 static void *sse_op_table1_avx[256][4] = {
-    [0x10] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
-    [0x11] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
-    [0x12] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
+    [0x10] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */
+    [0x11] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */ 
+    [0x12] = SSE_SPECIAL4,      /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+    [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
+    [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, m
+    [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
+
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
     [0x5c] = AVX128_FOP(sub),
@@ -3029,6 +3035,8 @@ static void *sse_op_table1_avx[256][4] = {
     [0x5e] = AVX128_FOP(div),
     [0x5f] = AVX128_FOP(max),
     // XXX add more as ops_sse is updated
+
+    [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
 };
 
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
@@ -3066,8 +3074,8 @@ static void *sse_op_table1_256[256][2] = {
     [0x5d] = AVX256_FOP(min),
     [0x5e] = AVX256_FOP(div),
     [0x5f] = AVX256_FOP(max),
-#if 0
     [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
+#if 0
     [0x7c] = { gen_helper_haddpd_256, gen_helper_haddps_256 },
     [0x7d] = { gen_helper_hsubpd_256, gen_helper_hsubps_256 },
     // XXX CMP??
@@ -3080,6 +3088,7 @@ static void *sse_op_table1_256[256][2] = {
 #endif
 };
 
+// need AVX
 static void *sse_op_table2[3 * 8][2] = {
     [0 + 2] = MMX_OP2(psrlw),
     [0 + 4] = MMX_OP2(psraw),
@@ -3916,6 +3925,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,mmx_t0.MMX_L(1)));
                 op1_offset = offsetof(CPUX86State,mmx_t0);
             }
+	    // XXX AVX 3 operands
             sse_op2 = sse_op_table2[((b - 1) & 3) * 8 + (((modrm >> 3)) & 7)][b1];
             if (!sse_op2)
                 goto illegal_op;
@@ -3929,6 +3939,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op2_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op1_offset);
             ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+	    gen_avx_clearup_mode(mode, op2_offset);
             break;
         case 0x050: /* movmskps */
             rm = (modrm & 7) | REX_B(s);
@@ -3972,8 +3983,6 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x22a: /* cvtsi2ss */
         case 0x32a: /* cvtsi2sd */
-	    if (has_vreg(mode, v))
-		return 1;
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
             gen_ldst_modrm(s, modrm, ot, OR_TMP0, 0);
             op1_offset = offsetof(CPUX86State,xmm_regs[reg]);
@@ -3985,6 +3994,13 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             } else {
                 ((void (*)(TCGv_ptr, TCGv))sse_op2)(cpu_ptr0, cpu_T[0]);
             }
+	    if (mode == VEX128) {
+		if (b == 0x22a)
+		    gen_op_movl(offsetof(CPUX86State,xmm_regs[reg]) + 4, 
+				offsetof(CPUX86State,xmm_regs[v]) + 4);
+		gen_op_movq(offsetof(CPUX86State,xmm_regs[reg]) + 8, 
+			    offsetof(CPUX86State,xmm_regs[v]) + 8);
+	    }
 	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x02c: /* cvttps2pi */
