@@ -3019,13 +3019,14 @@ static void *sse_op_table1[256][4] = {
 
 #define SSE_SPECIAL4 { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }
 
+/* helpers are all using three operands */
 static void *sse_op_table1_avx[256][4] = {
     [0x10] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */
     [0x11] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */ 
     [0x12] = SSE_SPECIAL4,      /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
     [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
-    [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, m
+    [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, */
     [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
 
     [0x58] = AVX128_FOP(add),
@@ -3160,21 +3161,19 @@ static void *sse_op_table5[256] = {
 };
 
 struct sse_op_helper_s {
-    void *op[3]; 
+    void *op[2]; 
     uint32_t ext_mask;
-    unsigned avx256 : 1;
 };
 #define MMX_OP3(x) \
-    { gen_helper_ ## x ## _mmx, gen_helper_ ## x ## _xmm, /* gen_helper_ ## x ## _avx */ }
-#define AVX_OP3(x) { NULL, gen_helper_ ## x ## _xmm, /* gen_helper_ ## xx ## _avx */ }
+    { gen_helper_ ## x ## _mmx, gen_helper_ ## x ## _xmm }
+#define AVX_OP3(x) { NULL, gen_helper_ ## x ## _xmm }
 
-#define SSSE3_OP(x) { MMX_OP3(x), CPUID_EXT_SSSE3, 0 }
-#define SSE41_OP(x) { AVX_OP3(x), CPUID_EXT_SSE41, 0 }
-#define SSE41_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE41, 1 }
-#define SSE42_OP(x) { AVX_OP3(x), CPUID_EXT_SSE42, 0 }
-#define SSE42_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE42, 1 }
-#define SSE41_SPECIAL { { NULL, SSE_SPECIAL, SSE_SPECIAL }, CPUID_EXT_SSE41, 0 }
-#define AVX256_OP(x)  { AVX_OP3(x), CPUID_EXT_AVX, 1 }
+#define SSSE3_OP(x) { MMX_OP3(x), CPUID_EXT_SSSE3}
+#define SSE41_OP(x) { AVX_OP3(x), CPUID_EXT_SSE41 }
+#define SSE41_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE41 }
+#define SSE42_OP(x) { AVX_OP3(x), CPUID_EXT_SSE42 }
+#define SSE42_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE42 }
+#define SSE41_SPECIAL { { NULL, SSE_SPECIAL }, CPUID_EXT_SSE41 }
 
 /* 0f 38 */
 static struct sse_op_helper_s sse_op_table6[256] = {
@@ -3351,7 +3350,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, int v,
 
     tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
     tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-    if (v != -1) {
+    if (mode >= VEX128) {
 	tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State, xmm_regs[v]));
 	((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr2, cpu_ptr1);
     } else {
@@ -3540,7 +3539,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
 
     tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
     tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-    if (v != -1) {
+    if (mode >= VEX128) {
 	tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State, xmm_regs[v]));
 	((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr, TCGv_i32))sse_op2)
 	    (cpu_ptr0, cpu_ptr2, cpu_ptr1, tcg_const_i32(val));
@@ -3579,13 +3578,13 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x1e7: /* movntdq */
         case 0x02b: /* movntps */
         case 0x12b: /* movntps */
-            if (mod == 3)
+            if (mod == 3 || has_vreg(mode, v))
                 goto illegal_op;
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
             gen_st_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x3f0: /* lddqu */
-            if (mod == 3)
+            if (mod == 3 || has_vreg(mode, v))
                 goto illegal_op;
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
             gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
@@ -3620,6 +3619,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             break;
         case 0x16e: /* movd xmm, ea */
+	    // XXX truncation rules
 #ifdef TARGET_X86_64
             if (s->dflag == 2) {
                 gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
@@ -4298,7 +4298,12 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         default:
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-	    ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+	    if (mode >= VEX128) {
+		// XXX operand order
+		tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State,xmm_regs[v]));
+		((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1, cpu_ptr2);
+	    } else
+		((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
             break;
         }
         if (b == 0x2e || b == 0x2f) {
