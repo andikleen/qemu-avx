@@ -2882,6 +2882,7 @@ static inline void gen_op_movq_env_0(int d_offset)
 #define SSE_FOP(x) { gen_helper_ ## x ## ps, gen_helper_ ## x ## pd, \
                      gen_helper_ ## x ## ss, gen_helper_ ## x ## sd, }
 
+/* SSE Classic */
 static void *sse_op_table1[256][4] = {
     /* 3DNow! extensions */
     [0x0e] = { SSE_DUMMY }, /* femms */
@@ -3019,8 +3020,8 @@ static void *sse_op_table1[256][4] = {
 
 #define SSE_SPECIAL4 { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }
 
-/* helpers are all using three operands */
-static void *sse_op_table1_avx[256][4] = {
+/* AVX 128bit versions of SSE ops, using 3op helpers */
+static void *avx_op_table1[256][4] = {
     [0x10] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */
     [0x11] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */ 
     [0x12] = SSE_SPECIAL4,      /* movlps, movlpd, movsldup, movddup */
@@ -3042,7 +3043,8 @@ static void *sse_op_table1_avx[256][4] = {
 
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
 
-static void *sse_op_table1_256[256][2] = {
+/* AVX 256bit commands, using 3op helpers */
+static void *avx_op_table1_256[256][2] = {
     [0x10] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x11] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x12] = { SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
@@ -3225,13 +3227,14 @@ static struct sse_op_helper_s sse_op_table6[256] = {
     [0x41] = SSE41_OP(phminposuw),
 };
 
-static void *sse_op_table6_avx[256][2] = {
+/* 3op */
+static void *avx_op_table6[256][2] = {
     // or 4?
     // XXX
 };
 
-
-static void *sse_op_table6_256[256][2] = {
+/* 3op */
+static void *avx_op_table6_256[256][2] = {
     // XXX
 };
 
@@ -3261,12 +3264,12 @@ static struct sse_op_helper_s sse_op_table7[256] = {
     [0x63] = SSE42_OP(pcmpistri),
 };
 
-static void *sse_op_table7_avx[256][2] = {
-    // XXX
+static void *avx_op_table7[256][2] = {
+    /* write me */
 };
 
-static void *sse_op_table7_256[256][2] = {
-    // XXX
+static void *avx_op_table7_256[256][2] = {
+    /* write me */
 };
 
 static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
@@ -3283,7 +3286,13 @@ static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
     return 0;
 }
 
-static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, int v, void *sse_op2)
+static inline int has_vreg(enum ssemode mode, int v)
+{
+    return (mode >= VEX128 && v != 0xf);
+}
+
+static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, 
+			int v, void *sse_op2, enum ssemode mode)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr;
     unsigned modrm, rm, reg, mod;
@@ -3363,7 +3372,8 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, int v,
     return 0;
 }
 
-static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v, void *sse_op2)
+static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, 
+			int v, void *sse_op2, enum ssemode mode)
 {
     int op1_offset, op2_offset, reg_addr, offset_addr, ot, val;
     unsigned modrm, rm, reg, mod;
@@ -3387,25 +3397,33 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
 	reg = ((modrm >> 3) & 7) | rex_r;
 	val = ldub_code(s->pc++);
 	switch (op) {
+	    // XXX double check zero extension for pextrb/w/d/q
 	case 0x14: /* pextrb */
+	    if (has_vreg(v, mode))
+		return 1;
 	    tcg_gen_ld8u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							xmm_regs[reg].XMM_B(val & 15)));
-	    if (mod == 3)
+	    if (mod == 3) {
 		gen_op_mov_reg_T0(ot, rm);
-	    else
+	    } else
 		tcg_gen_qemu_st8(cpu_T[0], cpu_A0,
 				 (s->mem_index >> 2) - 1);
 	    break;
 	case 0x15: /* pextrw */
+	    if (has_vreg(v, mode))
+		return 1;
 	    tcg_gen_ld16u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							 xmm_regs[reg].XMM_W(val & 7)));
-	    if (mod == 3)
+	    if (mod == 3) {
 		gen_op_mov_reg_T0(ot, rm);
-	    else
+	    } else {
 		tcg_gen_qemu_st16(cpu_T[0], cpu_A0,
 				  (s->mem_index >> 2) - 1);
+	    }
 	    break;
 	case 0x16:
+	    if (has_vreg(v, mode))
+		return 1;
 	    if (ot == OT_LONG) { /* pextrd */
 		tcg_gen_ld_i32(cpu_tmp2_i32, cpu_env,
 			       offsetof(CPUX86State,
@@ -3432,6 +3450,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
 	    }
 	    break;
 	case 0x17: /* extractps */
+	    // XXX
 	    tcg_gen_ld32u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							 xmm_regs[reg].XMM_L(val & 3)));
 	    if (mod == 3)
@@ -3549,13 +3568,8 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l, int v,
     return 0;
 }
 
-static inline int has_vreg(enum ssemode mode, int v)
-{
-    return (mode >= VEX128 && v != 0xf);
-}
-
-static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, void *sse_op2,
-		       enum ssemode mode, int b1, int v)
+static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, 
+		       void *sse_op2, enum ssemode mode, int b1, int v)
 {
     int op1_offset, op2_offset, val, ot;
     int modrm, mod, rm, reg, reg_addr, offset_addr;
@@ -4155,7 +4169,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    sse_op2 = sse_op_table6[b & 0xff].op[b1];
 	    if (!(s->cpuid_ext_features & sse_op_table6[b & 0xff].ext_mask))
 		return 1;
-	    if (gen_sse_op38(s, modrm, b1, rex_r, 0, -1, NULL))
+	    if (gen_sse_op38(s, modrm, b1, rex_r, 0, -1, NULL, mode))
 		goto illegal_op;
             break;
         case 0x338: /* crc32 */
@@ -4195,7 +4209,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    sse_op2 = sse_op_table7[b & 0xff].op[b1];
 	    if (!(s->cpuid_ext_features & sse_op_table7[b & 0xff].ext_mask))
 		return 1;
-	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0, -1, sse_op2))
+	    if (gen_sse_op3a(s, modrm, b1, rex_r, 0, -1, sse_op2, mode))
 		goto illegal_op;
 	    break;
         default:
@@ -4382,8 +4396,10 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     int l;
     enum ssemode mode;
 
+#if 0
     if (!(s->cpuid_ext_features & CPUID_EXT_AVX))
 	return 1;
+#endif
 
 #ifdef TARGET_X86_64
     rex_r = ((~b1 & 0x80) >> 3);
@@ -4421,10 +4437,10 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	    if (pp >= 2) 
 		return 1;
 	    mode = VEX256;
-	    sse_op2 = sse_op_table1_256[op][pp];
+	    sse_op2 = avx_op_table1_256[op][pp];
 	} else {
 	    mode = VEX128;
-	    sse_op2 = sse_op_table1_avx[op][pp];
+	    sse_op2 = avx_op_table1[op][pp];
 	}
 	if (!sse_op2) {
 	    if (pp == 0 && op == 0x77) {
@@ -4442,18 +4458,18 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 	if (pp >= 2)
 	    return 1;
 	if (l) 
-	    sse_op2 = sse_op_table7_256[op][pp];
+	    sse_op2 = avx_op_table7_256[op][pp];
 	else
-	    sse_op2 = sse_op_table7_avx[op][pp];
-	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2); 
+	    sse_op2 = avx_op_table7[op][pp];
+	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2, mode); 
     case 3: /* 0f 3a */
 	if (pp >= 2)
 	    return 1;
 	if (l) 
-	    sse_op2 = sse_op_table6_256[op][pp];
+	    sse_op2 = avx_op_table6_256[op][pp];
 	else
-	    sse_op2 = sse_op_table6_avx[op][pp];
-	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2);
+	    sse_op2 = avx_op_table6[op][pp];
+	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2, mode);
     default:
 	return 1;
     }
