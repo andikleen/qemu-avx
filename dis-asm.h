@@ -121,6 +121,8 @@ enum bfd_architecture
 #define bfd_mach_i386_i386_intel_syntax 2
 #define bfd_mach_x86_64 3
 #define bfd_mach_x86_64_intel_syntax 4
+#define bfd_mach_l1om_intel_syntax 5
+#define bfd_mach_l1om 6
   bfd_arch_we32k,      /* AT&T WE32xxx */
   bfd_arch_tahoe,      /* CCI/Harris Tahoe */
   bfd_arch_i860,       /* Intel 860 */
@@ -470,6 +472,9 @@ int generic_symbol_at_address(bfd_vma, struct disassemble_info *);
 
 #define _(x) x
 #define ATTRIBUTE_UNUSED __attribute__((unused))
+
+#define STRING_COMMA_LEN(x) x, sizeof(x)-1
+#define CONST_STRNEQ(a,b) (!strncmp(a,b,sizeof(b)-1))
 
 /* from libbfd */
 
