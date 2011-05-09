@@ -3033,10 +3033,16 @@ static void *avx_op_table1[256][4] = {
 
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
+    [0x5a] = { gen_helper_cvtps2pd_avx, gen_helper_cvtpd2ps_avx },
+    [0x5b] = { gen_helper_cvtdq2ps_avx, gen_helper_cvtps2dq_avx },
     [0x5c] = AVX128_FOP(sub),
     [0x5d] = AVX128_FOP(min),
     [0x5e] = AVX128_FOP(div),
     [0x5f] = AVX128_FOP(max),
+    [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
+    [0x7c] = { gen_helper_haddpd_avx, gen_helper_haddps_avx },
+    [0x7d] = { gen_helper_hsubpd_avx, gen_helper_hsubps_avx },
+
     // XXX add more as ops_sse is updated
 
     [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
@@ -3088,7 +3094,6 @@ static void *avx_op_table1_256[256][2] = {
     [0xf0] = { SSE_SPECIAL }, /* lddqu */
 };
 
-// need AVX
 static void *sse_op_table2[3 * 8][2] = {
     [0 + 2] = MMX_OP2(psrlw),
     [0 + 4] = MMX_OP2(psraw),
@@ -4422,7 +4427,7 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	    s->dflag = 2;
 	l = b2 & 0x4;
 	v = ~((b2 >> 3) & 0xf);
-    } else { /* 2 byte */
+    } else if (b == 0xc5) { /* 2 byte */
 	pp = b1 & 3; /* 0: none, 1: 66, 2: f3, 3: f2 */
 	mm = 1;
 	l = b1 & 0x4;
@@ -4433,7 +4438,7 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
     if (pre_sse_checks(s, pc_start))
 	return 0;
 
-    op = ldub_code(s->pc++);    
+    op = ldub_code(s->pc++);
 
     switch (mm) { 
     case 1: 
@@ -5738,7 +5743,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
             gen_op_mov_reg_T1(ot, reg);
         }
         break;
-    case 0xc4: /* les Gv or VEX 2 byte */
+    case 0xc4: /* les Gv or VEX 3 byte */
 	b1 = ldub_code(s->pc);
 	if ((b1 & 0xb0) == 0xb0 && s->pe) {
 	vex:
@@ -5752,7 +5757,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
 	}
 	op = R_ES;
         goto do_lxx;
-    case 0xc5: /* lds Gv or VEX 3 byte */
+    case 0xc5: /* lds Gv or VEX 2 byte */
 	b1 = ldub_code(s->pc);
         if ((b1 & 0x80) && s->pe)
 	    goto vex;
