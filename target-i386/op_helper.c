@@ -5736,6 +5736,14 @@ void helper_movq(void *d, void *s)
 #define SHIFT 1
 #include "ops_sse.h"
 
+#define OP 128
+#include "ops_avx.h"
+#undef OP
+
+#define OP 256
+#include "ops_avx.h"
+#undef OP
+
 #define SHIFT 0
 #include "helper_template.h"
 #undef SHIFT

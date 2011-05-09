@@ -20,6 +20,7 @@
 #if SHIFT == 0
 #define Reg MMXReg
 #define XMM_ONLY(...)
+#define AVX_ONLY(...)
 #define B(n) MMX_B(n)
 #define W(n) MMX_W(n)
 #define L(n) MMX_L(n)
@@ -28,6 +29,7 @@
 #else
 #define Reg XMMReg
 #define XMM_ONLY(...) __VA_ARGS__
+#define AVX_ONLY(...) __VA_ARGS__
 #define B(n) XMM_B(n)
 #define W(n) XMM_W(n)
 #define L(n) XMM_L(n)
@@ -252,7 +254,30 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     d->B(14) = F(d->B(14), s->B(14));\
     d->B(15) = F(d->B(15), s->B(15));\
     )\
-}
+}\
+AVX_ONLY(\
+void name ## _avx(Reg *d, Reg *a, Reg *b)\
+{\
+    d->B(0) = F(a->B(0), b->B(0));\
+    d->B(1) = F(a->B(1), b->B(1));\
+    d->B(2) = F(a->B(2), b->B(2));\
+    d->B(3) = F(a->B(3), b->B(3));\
+    d->B(4) = F(a->B(4), b->B(4));\
+    d->B(5) = F(a->B(5), b->B(5));\
+    d->B(6) = F(a->B(6), b->B(6));\
+    d->B(7) = F(a->B(7), b->B(7));\
+    d->B(8) = F(a->B(8), b->B(8));\
+    d->B(9) = F(a->B(9), b->B(9));\
+    d->B(10) = F(a->B(10), b->B(10));\
+    d->B(11) = F(a->B(11), b->B(11));\
+    d->B(12) = F(a->B(12), b->B(12));\
+    d->B(13) = F(a->B(13), b->B(13));\
+    d->B(14) = F(a->B(14), b->B(14));\
+    d->B(15) = F(a->B(15), b->B(15));\
+    avx_clear_upper(d);\
+}\
+)
+
 
 #define SSE_HELPER_W(name, F)\
 void glue(name, SUFFIX) (Reg *d, Reg *s)\
@@ -267,7 +292,21 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     d->W(6) = F(d->W(6), s->W(6));\
     d->W(7) = F(d->W(7), s->W(7));\
     )\
-}
+}\
+AVX_ONLY(\
+void name##_avx(Reg *d, Reg *a,Reg *b)\
+{\
+    d->W(0) = F(a->W(0), b->W(0));\
+    d->W(1) = F(a->W(1), b->W(1));\
+    d->W(2) = F(a->W(2), b->W(2));\
+    d->W(3) = F(a->W(3), b->W(3));\
+    d->W(4) = F(a->W(4), b->W(4));\
+    d->W(5) = F(a->W(5), b->W(5));\
+    d->W(6) = F(a->W(6), b->W(6));\
+    d->W(7) = F(a->W(7), b->W(7));\
+    avx_clear_upper(d);\
+}\
+)
 
 #define SSE_HELPER_L(name, F)\
 void glue(name, SUFFIX) (Reg *d, Reg *s)\
@@ -278,7 +317,17 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     d->L(2) = F(d->L(2), s->L(2));\
     d->L(3) = F(d->L(3), s->L(3));\
     )\
-}
+}\
+AVX_ONLY(\
+void name ##_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->L(0) = F(a->L(0), b->L(0));\
+    d->L(1) = F(a->L(1), b->L(1));\
+    d->L(2) = F(a->L(2), b->L(2));\
+    d->L(3) = F(a->L(3), b->L(3));\
+    avx_clear_upper(d);\
+}\
+)
 
 #define SSE_HELPER_Q(name, F)\
 void glue(name, SUFFIX) (Reg *d, Reg *s)\
@@ -287,7 +336,22 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     XMM_ONLY(\
     d->Q(1) = F(d->Q(1), s->Q(1));\
     )\
-}
+}\
+AVX_ONLY(\
+void name ## _avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->Q(0) = F(a->Q(0), b->Q(0));\
+    d->Q(1) = F(a->Q(1), b->Q(1));\
+    avx_clear_upper(d);\
+}\
+void name ## _256 (Reg *d, Reg *a, Reg *b)\
+{\
+    d->Q(0) = F(a->Q(0), b->Q(0));\
+    d->Q(1) = F(a->Q(1), b->Q(1));\
+    d->Q(2) = F(a->Q(2), b->Q(2));\
+    d->Q(3) = F(a->Q(3), b->Q(3));\
+}\
+)
 
 #if SHIFT == 0
 static inline int satub(int x)
@@ -661,26 +725,6 @@ void helper_cvtps2pd(Reg *d, Reg *s)
     d->XMM_D(1) = float32_to_float64(s1, &env->sse_status);
 }
 
-void helper_cvtps2pd_avx(Reg *d, Reg *a, Reg *b)
-{
-    float32 s0, s1;
-    s0 = a->XMM_S(0);
-    s1 = a->XMM_S(1);
-    d->XMM_D(0) = float32_to_float64(s0, &env->sse_status);
-    d->XMM_D(1) = float32_to_float64(s1, &env->sse_status);
-    avx_clear_upper(d);
-}
-
-void helper_cvtps2pd_256(Reg *d, Reg *a, Reg *b)
-{
-    float32 s;
-    int i;
-    for (i = 0; i < 4; i++) { 
-	s = a->XMM_S(i);
-	d->XMM_D(i) = float32_to_float64(s, &env->sse_status);
-    }
-}
-
 void helper_cvtpd2ps(Reg *d, Reg *s)
 {
     d->XMM_S(0) = float64_to_float32(s->XMM_D(0), &env->sse_status);
@@ -688,50 +732,16 @@ void helper_cvtpd2ps(Reg *d, Reg *s)
     d->Q(1) = 0;
 }
 
-void helper_cvtpd2ps_avx(Reg *d, Reg *a, Reg *b)
-{
-    d->XMM_S(0) = float64_to_float32(a->XMM_D(0), &env->sse_status);
-    d->XMM_S(1) = float64_to_float32(a->XMM_D(1), &env->sse_status);
-    d->Q(1) = 0;
-    avx_clear_upper(d);
-}
-
-void helper_cvtpd2ps_256(Reg *d, Reg *a, Reg *b)
-{
-    d->XMM_S(0) = float64_to_float32(a->XMM_D(0), &env->sse_status);
-    d->XMM_S(1) = float64_to_float32(a->XMM_D(1), &env->sse_status);
-    d->XMM_S(2) = float64_to_float32(a->XMM_D(2), &env->sse_status);
-    d->XMM_S(3) = float64_to_float32(a->XMM_D(3), &env->sse_status);
-}
-
 void helper_cvtss2sd(Reg *d, Reg *s)
 {
     d->XMM_D(0) = float32_to_float64(s->XMM_S(0), &env->sse_status);
 }
 
-/* operand order? */
-void helper_cvtss2sd_avx(Reg *d, Reg *a, Reg *b)
-{
-    d->XMM_D(0) = float32_to_float64(a->XMM_S(0), &env->sse_status);
-    d->Q(1) = b->Q(1);
-    avx_clear_upper(d);
-}
 
 void helper_cvtsd2ss(Reg *d, Reg *s)
 {
     d->XMM_S(0) = float64_to_float32(s->XMM_D(0), &env->sse_status);
 }
-
-
-void helper_cvtsd2ss_avx(Reg *d, Reg *a, Reg *b)
-{
-    d->XMM_S(0) = float64_to_float32(a->XMM_D(0), &env->sse_status);
-    d->XMM_S(1) = b->XMM_S(1);
-    d->XMM_Q(1) = b->XMM_Q(1);
-    avx_clear_upper(d);
-}
-
-// XXX continue converting
 
 /* integer to float */
 void helper_cvtdq2ps(Reg *d, Reg *s)
@@ -1025,22 +1035,65 @@ void helper_ ## name ## ps (Reg *d, Reg *s)\
     d->XMM_L(3) = F(32, d->XMM_S(3), s->XMM_S(3));\
 }\
 \
+void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_L(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
+    d->XMM_L(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
+    d->XMM_L(2) = F(32, a->XMM_S(2), b->XMM_S(2));\
+    d->XMM_L(3) = F(32, a->XMM_S(3), b->XMM_S(3));\
+    avx_clear_upper(d);\
+}\
+\
+void helper_ ## name ## ps_256 (Reg *d, Reg *a, Reg *b)\
+{\
+    int i;\
+    for (i = 0; i < 8; i++)\
+        d->XMM_L(i) = F(32, a->XMM_S(i), b->XMM_S(i));\
+}\
+\
 void helper_ ## name ## ss (Reg *d, Reg *s)\
 {\
     d->XMM_L(0) = F(32, d->XMM_S(0), s->XMM_S(0));\
 }\
+\
+void helper_ ## name ## ss_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_L(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
+    avx_clear_upper(d);\
+}\
+\
 void helper_ ## name ## pd (Reg *d, Reg *s)\
 {\
     d->XMM_Q(0) = F(64, d->XMM_D(0), s->XMM_D(0));\
     d->XMM_Q(1) = F(64, d->XMM_D(1), s->XMM_D(1));\
 }\
 \
+void helper_ ## name ## pd_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
+    d->XMM_Q(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
+    avx_clear_upper(d);\
+}\
+\
+void helper_ ## name ## pd_256 (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
+    d->XMM_Q(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
+    d->XMM_Q(2) = F(64, a->XMM_D(2), b->XMM_D(2));\
+    d->XMM_Q(3) = F(64, a->XMM_D(3), b->XMM_D(3));\
+}\
+\
 void helper_ ## name ## sd (Reg *d, Reg *s)\
 {\
     d->XMM_Q(0) = F(64, d->XMM_D(0), s->XMM_D(0));\
+}\
+\
+void helper_ ## name ## sd_avx (Reg *d, Reg *a, Reg *b)\
+{\
+    d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
 }
 
-#define FPU_CMPEQ(size, a, b) float ## size ## _eq_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPEQ(size, a, b) float ## size ## _eq(a, b, &env->sse_status) ? -1 : 0
 #define FPU_CMPLT(size, a, b) float ## size ## _lt(a, b, &env->sse_status) ? -1 : 0
 #define FPU_CMPLE(size, a, b) float ## size ## _le(a, b, &env->sse_status) ? -1 : 0
 #define FPU_CMPUNORD(size, a, b) float ## size ## _unordered_quiet(a, b, &env->sse_status) ? - 1 : 0
@@ -1291,6 +1344,7 @@ void glue(helper_punpck ## base_name ## qdq, SUFFIX) (Reg *d, Reg *s)  \
 
 UNPCK_OP(l, 0)
 UNPCK_OP(h, 1)
+#undef UNPCK_OPS
 
 /* 3DNow! float ops */
 #if SHIFT == 0
@@ -2197,3 +2251,4 @@ target_ulong helper_popcnt(target_ulong n, uint32_t type)
 #undef L
 #undef Q
 #undef SUFFIX
+#undef AVX_ONLY

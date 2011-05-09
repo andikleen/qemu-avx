@@ -3026,6 +3026,7 @@ static void *avx_op_table1[256][4] = {
     [0x11] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */ 
     [0x12] = SSE_SPECIAL4,      /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+    [0x14] = { gen_helper_punpckldq_avx, gen_helper_punpckldq_avx },
     [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
     [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, */
     [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
@@ -3049,9 +3050,9 @@ static void *avx_op_table1_256[256][2] = {
     [0x11] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x12] = { SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
+// 14? 
+// 15?
 #if 0
-    [0x14] = { gen_helper_punpckldq_256, gen_helper_punpcklqdq_256 },
-    [0x15] = { gen_helper_punpckhdq_256, gen_helper_punpckhqdq_256 },
     [0x16] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
     [0x17] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
     [0x28] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
@@ -3059,36 +3060,32 @@ static void *avx_op_table1_256[256][2] = {
     [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */
 #endif
     [0x51] = AVX256_FOP(sqrt),
-#if 0
     [0x52] = { gen_helper_rsqrtps_256, NULL },
     [0x53] = { gen_helper_rcpps_256, NULL },
     [0x54] = { gen_helper_pand_256, gen_helper_pand_256 }, /* andps, andpd */
-    [0x55] = { gen_helper_pandn_256, gen_helper_pandn_256 }, /* andnps, andnpd */
-    [0x56] = { gen_helper_por_256, gen_helper_por_256 }, /* orps, orpd */
-    [0x57] = { gen_helper_pxor_256, gen_helper_pxor_256 }, /* xorps, xorpd */
-#endif
+    [0x55] = { gen_helper_pandn_256, gen_helper_pandn_256 },/* andnps, andnpd */
+    [0x56] = { gen_helper_por_256, gen_helper_por_256 },  /* orps, orpd */
+    [0x57] = { gen_helper_pxor_avx, gen_helper_pxor_avx }, /* xorps, xorpd */
     [0x58] = AVX256_FOP(add),
     [0x59] = AVX256_FOP(mul),
-#if 0
-    [0x5a] = { gen_helper_cvtps2pd_256, gen_helper_cvtpd2ps_256 }
+    [0x5a] = { gen_helper_cvtps2pd_256, gen_helper_cvtpd2ps_256 },
     [0x5b] = { gen_helper_cvtdq2ps_256, gen_helper_cvtps2dq_256 },
-#endif
     [0x5c] = AVX256_FOP(sub),
     [0x5d] = AVX256_FOP(min),
     [0x5e] = AVX256_FOP(div),
     [0x5f] = AVX256_FOP(max),
     [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
-#if 0
     [0x7c] = { gen_helper_haddpd_256, gen_helper_haddps_256 },
     [0x7d] = { gen_helper_hsubpd_256, gen_helper_hsubps_256 },
     // XXX CMP??
+#if 0
     [0xc6] = { gen_helper_shufps_256, gen_helper_shufpd_256 },
+#endif
     [0xd0] = { gen_helper_addsubpd_256, gen_helper_addsubps_256 },
     // XXX third entry? check
-    [0xe6] = { gen_helper_cvttpd2dq_256, gen_helper_cvtdq2pd_256, gen_helper_cvtpd2dq_256 },
+    [0xe6] = { gen_helper_cvttpd2dq_256, gen_helper_cvtdq2pd_256 },
     // XXX check encoding
     [0xf0] = { SSE_SPECIAL }, /* lddqu */
-#endif
 };
 
 // need AVX
@@ -3771,22 +3768,29 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));   	
             break;
         case 0x216: /* movshdup */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+		if (mode == VEX256) {
+		}
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(1)));
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(3)));
+		if (mode == VEX256) { 
+
+		}
             }
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)));
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)));
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x178:
         case 0x378:
@@ -4388,7 +4392,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
 }
 
 /* Handle AVX with VEX prefixes */
-static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
+static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 {
     unsigned b2, mm, pp, v;
     int rex_r, op;
@@ -4406,7 +4410,7 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     s->rex_x = 0;
     REX_B(s) = 0;
 #endif
-    if (b == 0xc5) { /* 3 byte */
+    if (b == 0xc4) { /* 3 byte */
 #ifdef TARGET_X86_64
 	s->rex_x = (~b1 & 0x40) >> 3;
 	s->rex_b = (~b1 & 0x20) >> 1;
@@ -4457,18 +4461,24 @@ static int gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
     case 2: /* 0f 38 */
 	if (pp >= 2)
 	    return 1;
-	if (l) 
+	if (l) {
+	    mode = VEX256;
 	    sse_op2 = avx_op_table7_256[op][pp];
-	else
+	} else {
+	    mode = VEX128;
 	    sse_op2 = avx_op_table7[op][pp];
+	}
 	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2, mode); 
     case 3: /* 0f 3a */
 	if (pp >= 2)
 	    return 1;
-	if (l) 
+	if (l) {
+	    mode = VEX256;
 	    sse_op2 = avx_op_table6_256[op][pp];
-	else
+	} else {
+	    mode = VEX128;
 	    sse_op2 = avx_op_table6[op][pp];
+	}
 	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2, mode);
     default:
 	return 1;
@@ -5737,7 +5747,8 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
 	    if (prefixes & ~PREFIX_ADR)
 		goto illegal_op;
 	    if (gen_vex(s, b, b1, prefixes))
-		goto illegal_op;    
+		goto illegal_op;
+	    break;
 	}
 	op = R_ES;
         goto do_lxx;

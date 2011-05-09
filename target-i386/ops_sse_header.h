@@ -19,9 +19,11 @@
 #if SHIFT == 0
 #define Reg MMXReg
 #define SUFFIX _mmx
+#define AVX_ONLY(...)
 #else
 #define Reg XMMReg
 #define SUFFIX _xmm
+#define AVX_ONLY(...) __VA_ARGS__
 #endif
 
 #define dh_alias_Reg ptr
@@ -34,31 +36,54 @@
 #define dh_is_signed_XMMReg dh_is_signed_ptr
 #define dh_is_signed_MMXReg dh_is_signed_ptr
 
-DEF_HELPER_2(glue(psrlw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psraw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psllw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psrld, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psrad, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pslld, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psrlq, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psllq, SUFFIX), void, Reg, Reg)
+#define DEF_HELPER_AVX128(name, suffix)					\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)		\
+	AVX_ONLY(DEF_HELPER_3(glue(name,_avx), void, Reg, Reg, Reg))
+
+#define DEF_HELPER_AVX128_2OP(name, suffix)				\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)	\
+	AVX_ONLY(DEF_HELPER_2(glue(name,_avx), void, Reg, Reg))
+
+#define DEF_HELPER_AVX256(name, suffix)					\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)		\
+	AVX_ONLY(DEF_HELPER_3(glue(name,_avx), void, Reg, Reg, Reg))	\
+	AVX_ONLY(DEF_HELPER_3(glue(name,_256), void, Reg, Reg, Reg))
+
+#define DEF_HELPER_AVX256_2OP(name, suffix)				\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)	\
+	AVX_ONLY(DEF_HELPER_2(glue(name,_avx), void, Reg, Reg))	\
+	AVX_ONLY(DEF_HELPER_2(glue(name,_256), void, Reg, Reg))
+
+DEF_HELPER_AVX128(psrlw,SUFFIX)
+DEF_HELPER_AVX128(psraw,SUFFIX)
+DEF_HELPER_AVX128(psllw,SUFFIX)
+DEF_HELPER_AVX128(psrld,SUFFIX)
+DEF_HELPER_AVX128(psrad,SUFFIX)
+DEF_HELPER_AVX128(pslld,SUFFIX)
+DEF_HELPER_AVX128(psrlq,SUFFIX)
+DEF_HELPER_AVX128(psllq,SUFFIX)
 
 #if SHIFT == 1
-DEF_HELPER_2(glue(psrldq, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pslldq, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(psrldq,SUFFIX)
+DEF_HELPER_AVX128(pslldq,SUFFIX)
 #endif
 
 #define SSE_HELPER_B(name, F)\
-    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)
+    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)\
+    AVX_ONLY(DEF_HELPER_3(glue(name,_avx), void, Reg, Reg, Reg))
 
 #define SSE_HELPER_W(name, F)\
-    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)
+    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)\
+    AVX_ONLY(DEF_HELPER_3(glue(name, _avx), void, Reg, Reg, Reg))
 
 #define SSE_HELPER_L(name, F)\
-    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)
+    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)\
+    AVX_ONLY(DEF_HELPER_3(glue(name, _avx), void, Reg, Reg, Reg))
 
 #define SSE_HELPER_Q(name, F)\
-    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)
+    DEF_HELPER_2(glue(name, SUFFIX), void, Reg, Reg)\
+    AVX_ONLY(DEF_HELPER_3(glue(name, _avx), void, Reg, Reg, Reg))\
+    AVX_ONLY(DEF_HELPER_3(glue(name, _256), void, Reg, Reg, Reg))
 
 SSE_HELPER_B(paddb, FADD)
 SSE_HELPER_W(paddw, FADD)
@@ -109,14 +134,16 @@ SSE_HELPER_W(pmulhw, FMULHW)
 SSE_HELPER_B(pavgb, FAVG)
 SSE_HELPER_W(pavgw, FAVG)
 
-DEF_HELPER_2(glue(pmuludq, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaddwd, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(pmuludq, SUFFIX)
+DEF_HELPER_AVX128(pmaddwd, SUFFIX)
 
-DEF_HELPER_2(glue(psadbw, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(psadbw, SUFFIX)
 DEF_HELPER_3(glue(maskmov, SUFFIX), void, Reg, Reg, tl)
 DEF_HELPER_2(glue(movl_mm_T0, SUFFIX), void, Reg, i32)
+AVX_ONLY(DEF_HELPER_2(movl_mm_T0_avx, void, Reg, i32))
 #ifdef TARGET_X86_64
 DEF_HELPER_2(glue(movq_mm_T0, SUFFIX), void, Reg, i64)
+AVX_ONLY(DEF_HELPER_2(movq_mm_T0_avx, void, Reg, i64))
 #endif
 
 #if SHIFT == 0
@@ -134,17 +161,10 @@ DEF_HELPER_3(glue(pshufhw, SUFFIX), void, Reg, Reg, int)
 /* XXX: not accurate */
 
 #define SSE_HELPER_S(name, F)\
-    DEF_HELPER_2(name ## ps , void, Reg, Reg)        \
-    DEF_HELPER_2(name ## ss , void, Reg, Reg)        \
-    DEF_HELPER_2(name ## pd , void, Reg, Reg)        \
-    DEF_HELPER_2(name ## sd , void, Reg, Reg)	     \
-    DEF_HELPER_3(name ## ps_avx , void, Reg, Reg, Reg)	 \
-    DEF_HELPER_3(name ## ps_256 , void, Reg, Reg, Reg)	 \
-    DEF_HELPER_3(name ## ss_avx , void, Reg, Reg, Reg)	 \
-    DEF_HELPER_3(name ## pd_avx , void, Reg, Reg, Reg)	 \
-    DEF_HELPER_3(name ## pd_256 , void, Reg, Reg, Reg)	 \
-    DEF_HELPER_3(name ## sd_avx , void, Reg, Reg, Reg)   \
-
+    DEF_HELPER_AVX256(name ## ps,)	 \
+    DEF_HELPER_AVX128(name ## ss,)	 \
+    DEF_HELPER_AVX256(name ## pd,)	 \
+    DEF_HELPER_AVX128(name ## sd,)
 
 SSE_HELPER_S(add, FPU_ADD)
 SSE_HELPER_S(sub, FPU_SUB)
@@ -155,30 +175,28 @@ SSE_HELPER_S(max, FPU_MAX)
 SSE_HELPER_S(sqrt, FPU_SQRT)
 
 
-DEF_HELPER_2(cvtps2pd, void, Reg, Reg)
-DEF_HELPER_3(cvtps2pd_avx, void, Reg, Reg, Reg)
-DEF_HELPER_3(cvtps2pd_256, void, Reg, Reg, Reg)
-DEF_HELPER_2(cvtpd2ps, void, Reg, Reg)
-DEF_HELPER_3(cvtpd2ps_avx, void, Reg, Reg, Reg)
-DEF_HELPER_3(cvtpd2ps_256, void, Reg, Reg, Reg)
-DEF_HELPER_2(cvtss2sd, void, Reg, Reg)
-DEF_HELPER_3(cvtss2sd_avx, void, Reg, Reg, Reg)
-DEF_HELPER_2(cvtsd2ss, void, Reg, Reg)
-DEF_HELPER_3(cvtsd2ss_avx, void, Reg, Reg, Reg)
-DEF_HELPER_2(cvtdq2ps, void, Reg, Reg)
-DEF_HELPER_2(cvtdq2pd, void, Reg, Reg)
+DEF_HELPER_AVX256_2OP(cvtps2pd,)
+DEF_HELPER_AVX256_2OP(cvtpd2ps,)
+DEF_HELPER_AVX128(cvtss2sd,)
+DEF_HELPER_AVX128(cvtsd2ss,)
+DEF_HELPER_AVX256_2OP(cvtdq2ps,)
+DEF_HELPER_AVX256_2OP(cvtdq2pd,)
 DEF_HELPER_2(cvtpi2ps, void, XMMReg, MMXReg)
 DEF_HELPER_2(cvtpi2pd, void, XMMReg, MMXReg)
 DEF_HELPER_2(cvtsi2ss, void, XMMReg, i32)
+DEF_HELPER_2(cvtsi2ss_avx, void, XMMReg, i32)
 DEF_HELPER_2(cvtsi2sd, void, XMMReg, i32)
+DEF_HELPER_2(cvtsi2sd_avx, void, XMMReg, i32)
 
 #ifdef TARGET_X86_64
 DEF_HELPER_2(cvtsq2ss, void, XMMReg, i64)
+DEF_HELPER_2(cvtsq2ss_avx, void, XMMReg, i64)
 DEF_HELPER_2(cvtsq2sd, void, XMMReg, i64)
+DEF_HELPER_2(cvtsq2sd_avx, void, XMMReg, i64)
 #endif
 
-DEF_HELPER_2(cvtps2dq, void, XMMReg, XMMReg)
-DEF_HELPER_2(cvtpd2dq, void, XMMReg, XMMReg)
+DEF_HELPER_AVX256_2OP(cvtps2dq,)
+DEF_HELPER_AVX256_2OP(cvtpd2dq,)
 DEF_HELPER_2(cvtps2pi, void, MMXReg, XMMReg)
 DEF_HELPER_2(cvtpd2pi, void, MMXReg, XMMReg)
 DEF_HELPER_1(cvtss2si, s32, XMMReg)
@@ -188,8 +206,8 @@ DEF_HELPER_1(cvtss2sq, s64, XMMReg)
 DEF_HELPER_1(cvtsd2sq, s64, XMMReg)
 #endif
 
-DEF_HELPER_2(cvttps2dq, void, XMMReg, XMMReg)
-DEF_HELPER_2(cvttpd2dq, void, XMMReg, XMMReg)
+DEF_HELPER_AVX256_2OP(cvttps2dq,)
+DEF_HELPER_AVX256_2OP(cvttpd2dq,)
 DEF_HELPER_2(cvttps2pi, void, MMXReg, XMMReg)
 DEF_HELPER_2(cvttpd2pi, void, MMXReg, XMMReg)
 DEF_HELPER_1(cvttss2si, s32, XMMReg)
@@ -199,26 +217,28 @@ DEF_HELPER_1(cvttss2sq, s64, XMMReg)
 DEF_HELPER_1(cvttsd2sq, s64, XMMReg)
 #endif
 
-DEF_HELPER_2(rsqrtps, void, XMMReg, XMMReg)
-DEF_HELPER_2(rsqrtss, void, XMMReg, XMMReg)
-DEF_HELPER_2(rcpps, void, XMMReg, XMMReg)
-DEF_HELPER_2(rcpss, void, XMMReg, XMMReg)
-DEF_HELPER_2(extrq_r, void, XMMReg, XMMReg)
+DEF_HELPER_AVX256_2OP(rsqrtps,)
+DEF_HELPER_AVX128_2OP(rsqrtss,)
+DEF_HELPER_AVX256_2OP(rcpps,)
+DEF_HELPER_AVX128_2OP(rcpss,)
+DEF_HELPER_AVX128_2OP(extrq_r,)
 DEF_HELPER_3(extrq_i, void, XMMReg, int, int)
-DEF_HELPER_2(insertq_r, void, XMMReg, XMMReg)
+DEF_HELPER_3(extrq_i_avx, void, XMMReg, int, int)
+DEF_HELPER_AVX128_2OP(insertq_r,)
 DEF_HELPER_3(insertq_i, void, XMMReg, int, int)
-DEF_HELPER_2(haddps, void, XMMReg, XMMReg)
-DEF_HELPER_2(haddpd, void, XMMReg, XMMReg)
-DEF_HELPER_2(hsubps, void, XMMReg, XMMReg)
-DEF_HELPER_2(hsubpd, void, XMMReg, XMMReg)
-DEF_HELPER_2(addsubps, void, XMMReg, XMMReg)
-DEF_HELPER_2(addsubpd, void, XMMReg, XMMReg)
+DEF_HELPER_3(insertq_i_avx, void, XMMReg, int, int)
+DEF_HELPER_AVX256(haddps,)
+DEF_HELPER_AVX256(haddpd,)
+DEF_HELPER_AVX256(hsubps,)
+DEF_HELPER_AVX256(hsubpd,)
+DEF_HELPER_AVX256(addsubps,)
+DEF_HELPER_AVX256(addsubpd,)
 
 #define SSE_HELPER_CMP(name, F)\
-    DEF_HELPER_2( name ## ps , void, Reg, Reg)        \
-    DEF_HELPER_2( name ## ss , void, Reg, Reg)        \
-    DEF_HELPER_2( name ## pd , void, Reg, Reg)        \
-    DEF_HELPER_2( name ## sd , void, Reg, Reg)
+    DEF_HELPER_AVX256( name ## ps,)	  \
+    DEF_HELPER_AVX128( name ## ss,)	  \
+    DEF_HELPER_AVX256( name ## pd,)	  \
+    DEF_HELPER_AVX128( name ## sd,)
 
 SSE_HELPER_CMP(cmpeq, FPU_CMPEQ)
 SSE_HELPER_CMP(cmplt, FPU_CMPLT)
@@ -234,24 +254,28 @@ DEF_HELPER_2(comiss, void, Reg, Reg)
 DEF_HELPER_2(ucomisd, void, Reg, Reg)
 DEF_HELPER_2(comisd, void, Reg, Reg)
 DEF_HELPER_1(movmskps, i32, Reg)
+DEF_HELPER_1(movmskps_avx, i32, Reg)
+DEF_HELPER_1(movmskps_256, i32, Reg)
 DEF_HELPER_1(movmskpd, i32, Reg)
+DEF_HELPER_1(movmskpd_avx, i32, Reg)
+DEF_HELPER_1(movmskpd_256, i32, Reg)
 #endif
 
 DEF_HELPER_1(glue(pmovmskb, SUFFIX), i32, Reg)
-DEF_HELPER_2(glue(packsswb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(packuswb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(packssdw, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(packsswb, SUFFIX)
+DEF_HELPER_AVX128(packuswb, SUFFIX)
+DEF_HELPER_AVX128(packssdw, SUFFIX)
 #define UNPCK_OP(base_name, base)                               \
-    DEF_HELPER_2(glue(punpck ## base_name ## bw, SUFFIX) , void, Reg, Reg) \
-    DEF_HELPER_2(glue(punpck ## base_name ## wd, SUFFIX) , void, Reg, Reg) \
-    DEF_HELPER_2(glue(punpck ## base_name ## dq, SUFFIX) , void, Reg, Reg)
+    DEF_HELPER_AVX128(punpck ## base_name ## bw, SUFFIX) \
+    DEF_HELPER_AVX128(punpck ## base_name ## wd, SUFFIX) \
+    DEF_HELPER_AVX128(punpck ## base_name ## dq, SUFFIX)
 
 UNPCK_OP(l, 0)
 UNPCK_OP(h, 1)
 
 #if SHIFT == 1
-DEF_HELPER_2(glue(punpcklqdq, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(punpckhqdq, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(punpcklqdq, SUFFIX)
+DEF_HELPER_AVX128(punpckhqdq, SUFFIX)
 #endif
 
 /* 3DNow! float ops */
@@ -278,21 +302,21 @@ DEF_HELPER_2(pswapd, void, MMXReg, MMXReg)
 #endif
 
 /* SSSE3 op helpers */
-DEF_HELPER_2(glue(phaddw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(phaddd, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(phaddsw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(phsubw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(phsubd, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(phsubsw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pabsb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pabsw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pabsd, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaddubsw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmulhrsw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pshufb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psignb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psignw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(psignd, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(phaddw, SUFFIX)
+DEF_HELPER_AVX128(phaddd, SUFFIX)
+DEF_HELPER_AVX128(phaddsw, SUFFIX)
+DEF_HELPER_AVX128(phsubw, SUFFIX)
+DEF_HELPER_AVX128(phsubd, SUFFIX)
+DEF_HELPER_AVX128(phsubsw, SUFFIX)
+DEF_HELPER_AVX128(pabsb, SUFFIX)
+DEF_HELPER_AVX128(pabsw, SUFFIX)
+DEF_HELPER_AVX128(pabsd, SUFFIX)
+DEF_HELPER_AVX128(pmaddubsw, SUFFIX)
+DEF_HELPER_AVX128(pmulhrsw, SUFFIX)
+DEF_HELPER_AVX128(pshufb, SUFFIX)
+DEF_HELPER_AVX128(psignb, SUFFIX)
+DEF_HELPER_AVX128(psignw, SUFFIX)
+DEF_HELPER_AVX128(psignd, SUFFIX)
 DEF_HELPER_3(glue(palignr, SUFFIX), void, Reg, Reg, s32)
 
 /* SSE4.1 op helpers */
@@ -314,17 +338,17 @@ DEF_HELPER_2(glue(pmovzxwd, SUFFIX), void, Reg, Reg)
 DEF_HELPER_2(glue(pmovzxwq, SUFFIX), void, Reg, Reg)
 DEF_HELPER_2(glue(pmovzxdq, SUFFIX), void, Reg, Reg)
 DEF_HELPER_2(glue(pmuldq, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pcmpeqq, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX256(pcmpeqq, SUFFIX)
 DEF_HELPER_2(glue(packusdw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pminsb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pminsd, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pminuw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pminud, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaxsb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaxsd, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaxuw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmaxud, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(pmulld, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX128(pminsb, SUFFIX)
+DEF_HELPER_AVX128(pminsd, SUFFIX)
+DEF_HELPER_AVX128(pminuw, SUFFIX)
+DEF_HELPER_AVX128(pminud, SUFFIX)
+DEF_HELPER_AVX128(pmaxsb, SUFFIX)
+DEF_HELPER_AVX128(pmaxsd, SUFFIX)
+DEF_HELPER_AVX128(pmaxuw, SUFFIX)
+DEF_HELPER_AVX128(pmaxud, SUFFIX)
+DEF_HELPER_AVX128(pmulld, SUFFIX)
 DEF_HELPER_2(glue(phminposuw, SUFFIX), void, Reg, Reg)
 DEF_HELPER_3(glue(roundps, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(roundpd, SUFFIX), void, Reg, Reg, i32)
@@ -340,7 +364,7 @@ DEF_HELPER_3(glue(mpsadbw, SUFFIX), void, Reg, Reg, i32)
 
 /* SSE4.2 op helpers */
 #if SHIFT == 1
-DEF_HELPER_2(glue(pcmpgtq, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX256(pcmpgtq, SUFFIX)
 DEF_HELPER_3(glue(pcmpestri, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(pcmpestrm, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(pcmpistri, SUFFIX), void, Reg, Reg, i32)
@@ -353,10 +377,15 @@ DEF_HELPER_2(popcnt, tl, tl, i32)
 #undef Reg
 #undef SUFFIX
 
+#undef AVX_ONLY
 #undef SSE_HELPER_B
 #undef SSE_HELPER_W
 #undef SSE_HELPER_L
 #undef SSE_HELPER_Q
 #undef SSE_HELPER_S
 #undef SSE_HELPER_CMP
+#undef DEF_HELPER_AVX128
+#undef DEF_HELPER_AVX128_2OP
+#undef DEF_HELPER_AVX256
+#undef DEF_HELPER_AVX256_OP
 #undef UNPCK_OP
