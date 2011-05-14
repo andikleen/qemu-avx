@@ -636,6 +636,26 @@ void helper_phsubsw_avx(Reg *d, Reg *a, Reg *b)
 }
 #endif
 
+// xxx can we pass 64bit?
+void glue(helper_vbroadcastsd, ASUFFIX)(Reg *d, uint64_t m)
+{
+	d->Q(0) = m;
+	d->Q(1) = m;
+	AVX256_OR_CLEAR(d, d->Q(2) = d->Q(3) = m);
+}
+
+void glue(helper_vbroadcastss, ASUFFIX)(Reg *d, uint32_t m)
+{
+	d->L(0) = m;
+	d->L(1) = m;
+	d->L(2) = m;
+	d->L(3) = m;
+	AVX256_OR_CLEAR(d, d->L(4) = d->L(5) = d->L(6) = d->L(7) = m);
+}
+
+// XXX 128 bit input
+
+
 #undef Reg
 #undef B
 #undef W
