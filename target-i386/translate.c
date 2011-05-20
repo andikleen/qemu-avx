@@ -3316,7 +3316,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l,
 	} else {
 	    op2_offset = offsetof(CPUX86State,xmm_t0);
 	    gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-	    switch (op) {
+	    switch (b) {
 	    case 0x20: case 0x30: /* pmovsxbw, pmovzxbw */
 	    case 0x23: case 0x33: /* pmovsxwd, pmovzxwd */
 	    case 0x25: case 0x35: /* pmovsxdq, pmovzxdq */
@@ -3368,7 +3368,7 @@ static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l,
 	((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
     }
 
-    if (op == 0x17)
+    if (b == 0x17)
 	s->cc_op = CC_OP_EFLAGS;
 
     return 0;
@@ -3398,7 +3398,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
 	    gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
 	reg = ((modrm >> 3) & 7) | rex_r;
 	val = ldub_code(s->pc++);
-	switch (op) {
+	switch (b) {
 	    // XXX double check zero extension for pextrb/w/d/q
 	case 0x14: /* pextrb */
 	    if (has_vreg(v, mode))
@@ -3550,7 +3550,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
     }
     val = ldub_code(s->pc++);
 
-    if ((op & 0xfc) == 0x60) { /* pcmpXstrX */
+    if ((b & 0xfc) == 0x60) { /* pcmpXstrX */
 	s->cc_op = CC_OP_EFLAGS;
 
 	if (s->dflag == 2)

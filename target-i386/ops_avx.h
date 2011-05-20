@@ -280,14 +280,18 @@ void glue(helper_rsqrtps, ASUFFIX)(Reg *d, Reg *s)
 {
     int i;
     for (i = 0; i < NUM_S; i++)
-	d->XMM_S(i) = approx_rsqrt(s->XMM_S(i));
+	d->XMM_S(i) = float32_div(float32_one,
+				  float32_sqrt(s->XMM_S(i), &env->sse_status),
+				  &env->sse_status);
     AVX128_CLEAR_UPPER(d);
 }
 
 #if OP == 128
 void helper_rsqrtss_avx(Reg *d, Reg *s)
 {
-    d->XMM_S(0) = approx_rsqrt(s->XMM_S(0));
+    d->XMM_S(0) = float32_div(float32_one,
+                              float32_sqrt(s->XMM_S(0), &env->sse_status),
+                              &env->sse_status);
     avx_clear_upper(d);
 }
 #endif
@@ -296,14 +300,14 @@ void glue(helper_rcpps, ASUFFIX)(Reg *d, Reg *s)
 {
     int i;
     for (i = 0; i < NUM_S; i++)
-	d->XMM_S(i) = approx_rcp(s->XMM_S(i));
+	d->XMM_S(i) = float32_div(float32_one, s->XMM_S(i), &env->sse_status);;
     AVX128_CLEAR_UPPER(d);
 }
 
 #if OP == 128
 void helper_rcpss_avx(Reg *d, Reg *s)
 {
-    d->XMM_S(0) = approx_rcp(s->XMM_S(0));
+    d->XMM_S(0) = float32_div(float32_one, s->XMM_S(0), &env->sse_status);;
     AVX128_CLEAR_UPPER(d);
 }
 
