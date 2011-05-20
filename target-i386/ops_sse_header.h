@@ -156,6 +156,13 @@ DEF_HELPER_3(glue(pshuflw, SUFFIX), void, Reg, Reg, int)
 DEF_HELPER_3(glue(pshufhw, SUFFIX), void, Reg, Reg, int)
 #endif
 
+#if 0
+AVX_ONLY(DEF_HELPER_2(vbroadcastsd_avx, void, Reg, uint64_t)); // XXX
+AVX_ONLY(DEF_HELPER_2(vbroadcastsd_256, void, Reg, uint64_t)); // XXX
+AVX_ONLY(DEF_HELPER_2(vbroadcastss_avx, void, Reg, uint32_t));
+AVX_ONLY(DEF_HELPER_2(vbroadcastss_256, void, Reg, uint32_t));
+#endif
+
 #if SHIFT == 1
 /* FPU ops */
 /* XXX: not accurate */
