@@ -3034,7 +3034,8 @@ static void *avx_op_table1[256][4] = {
 
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
-    [0x5a] = { gen_helper_cvtps2pd_avx, gen_helper_cvtpd2ps_avx },
+    [0x5a] = { gen_helper_cvtps2pd_avx, gen_helper_cvtpd2ps_avx,
+	       gen_helper_cvtss2sd_avx, gen_helper_cvtsd2ss_avx },
     [0x5b] = { gen_helper_cvtdq2ps_avx, gen_helper_cvtps2dq_avx },
     [0x5c] = AVX128_FOP(sub),
     [0x5d] = AVX128_FOP(min),
