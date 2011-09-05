@@ -168,11 +168,11 @@ void glue(helper_cvtpd2ps, ASUFFIX)(Reg *d, Reg *a)
 
 void glue(helper_cvtps2pd, ASUFFIX)(Reg *d, Reg *s)
 {
-    d->XMM_S(0) = float64_to_float32(s->XMM_D(0), &env->sse_status);
-    d->XMM_S(1) = float64_to_float32(s->XMM_D(1), &env->sse_status);
+    d->XMM_D(0) = float32_to_float64(s->XMM_S(0), &env->sse_status);
+    d->XMM_D(1) = float32_to_float64(s->XMM_S(1), &env->sse_status);
     AVX256_OR_CLEAR(d,
-    d->XMM_S(2) = float64_to_float32(s->XMM_D(2), &env->sse_status);
-    d->XMM_S(3) = float64_to_float32(s->XMM_D(3), &env->sse_status);)
+    d->XMM_D(2) = float32_to_float64(s->XMM_S(2), &env->sse_status);
+    d->XMM_D(3) = float32_to_float64(s->XMM_S(3), &env->sse_status);)
 }
 
 #if OP == 128
