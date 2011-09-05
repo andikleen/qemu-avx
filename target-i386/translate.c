@@ -3031,7 +3031,16 @@ static void *avx_op_table1[256][4] = {
     [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
     [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, */
     [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
-
+    [0x2e] = { gen_helper_ucomiss_avx, gen_helper_ucomisd_avx },
+    [0x2f] = { gen_helper_comiss, gen_helper_comisd },
+    [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */   
+    [0x51] = AVX128_FOP(sqrt),
+    [0x52] = { gen_helper_rsqrtps_avx, NULL, gen_helper_rsqrtss_avx, NULL },
+    [0x53] = { gen_helper_rcpps_avx, NULL, gen_helper_rcpss_avx, NULL },
+    [0x54] = { gen_helper_pand_avx, gen_helper_pand_avx }, /* andps, andpd */
+    [0x55] = { gen_helper_pandn_avx, gen_helper_pandn_avx }, /* andnps, andnpd */
+    [0x56] = { gen_helper_por_avx, gen_helper_por_avx }, /* orps, orpd */
+    [0x57] = { gen_helper_pxor_avx, gen_helper_pxor_avx }, /* xorps, xorpd */
     [0x58] = AVX128_FOP(add),
     [0x59] = AVX128_FOP(mul),
     [0x5a] = { gen_helper_cvtps2pd_avx, gen_helper_cvtpd2ps_avx,
@@ -3403,7 +3412,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
 	switch (b) {
 	    // XXX double check zero extension for pextrb/w/d/q
 	case 0x14: /* pextrb */
-	    if (has_vreg(v, mode))
+	    if (has_vreg(mode, v))
 		return 1;
 	    tcg_gen_ld8u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							xmm_regs[reg].XMM_B(val & 15)));
@@ -3414,7 +3423,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
 				 (s->mem_index >> 2) - 1);
 	    break;
 	case 0x15: /* pextrw */
-	    if (has_vreg(v, mode))
+	    if (has_vreg(mode, v))
 		return 1;
 	    tcg_gen_ld16u_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,
 							 xmm_regs[reg].XMM_W(val & 7)));
@@ -3426,7 +3435,7 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
 	    }
 	    break;
 	case 0x16:
-	    if (has_vreg(v, mode))
+	    if (has_vreg(mode, v))
 		return 1;
 	    if (ot == OT_LONG) { /* pextrd */
 		tcg_gen_ld_i32(cpu_tmp2_i32, cpu_env,
@@ -3968,12 +3977,14 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    gen_avx_clearup_mode(mode, op2_offset);
             break;
         case 0x050: /* movmskps */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             rm = (modrm & 7) | REX_B(s);
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, 
                              offsetof(CPUX86State,xmm_regs[rm]));
             gen_helper_movmskps(cpu_tmp2_i32, cpu_ptr0);
             tcg_gen_extu_i32_tl(cpu_T[0], cpu_tmp2_i32);
-            gen_op_mov_reg_T0(OT_LONG, reg);
+            gen_op_mov_reg_T0(OT_LONG, reg);	    
             break;
         case 0x150: /* movmskpd */
             rm = (modrm & 7) | REX_B(s);

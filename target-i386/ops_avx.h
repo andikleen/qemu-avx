@@ -36,6 +36,15 @@
 #define Q(n) XMM_Q(n)
 
 #if OP == 128
+#define AVX128_SIMPLE(x,y)			\
+	void helper_##x##_avx(Reg *d, Reg *s) {	\
+	    avx_clear_upper(d);			\
+	    helper_##x##y(d, s);             \
+	}
+
+AVX128_SIMPLE(ucomisd,)
+AVX128_SIMPLE(ucomiss,)
+
 void helper_pmuludq_avx(Reg *d, Reg *a, Reg *b)
 {
     d->Q(0) = (uint64_t)a->L(0) * (uint64_t)b->L(0);
