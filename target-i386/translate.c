@@ -2815,13 +2815,14 @@ enum ssemode { MMX, XMM, VEX128, VEX256 }; /* order matters */
 static inline void gen_avx_clearup(int offset)
 {
     tcg_gen_movi_i64(cpu_tmp1_i64, 0);
-    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset);
+    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset + 16);
+    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset + 24);
 }
 
 static inline void gen_xmm_clearup(int offset)
 {
-    tcg_gen_movi_i32(cpu_tmp2_i32, 0);
-    tcg_gen_st_i32(cpu_tmp2_i32, cpu_env, offset);
+    tcg_gen_movi_i64(cpu_tmp1_i64, 0);
+    tcg_gen_st_i64(cpu_tmp1_i64, cpu_env, offset + 8);
 }
 
 static inline void gen_avx_clearup_mode(enum ssemode mode, int offset)
@@ -3701,10 +3702,12 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movl_T0_0();
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)));
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)));
+		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
+		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[rm]));
             }
             break;
         case 0x012: /* movlps */
@@ -3897,12 +3900,11 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x311: /* movsd ea, xmm */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_st_env_A0_mode(mode,s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+                gen_stq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
-		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[rm]));
             }
             break;
         case 0x013: /* movlps */
@@ -4426,12 +4428,12 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	if (b2 & 0x80) 
 	    s->dflag = 2;
 	l = b2 & 0x4;
-	v = ~((b2 >> 3) & 0xf);
+	v = ~(b2 >> 3) & 0xf;
     } else if (b == 0xc5) { /* 2 byte */
 	pp = b1 & 3; /* 0: none, 1: 66, 2: f3, 3: f2 */
 	mm = 1;
 	l = b1 & 0x4;
-	v = ~((b1 >> 3) & 0xf);
+	v = ~(b1 >> 3) & 0xf;
     }
     s->prefix |= PREFIX_VEX;
 
