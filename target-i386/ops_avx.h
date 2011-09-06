@@ -36,14 +36,23 @@
 #define Q(n) XMM_Q(n)
 
 #if OP == 128
-#define AVX128_SIMPLE(x,y)			\
+#if 0
+#define AVX128_EXTEND_ONLY(x,y)			\
 	void helper_##x##_avx(Reg *d, Reg *s) {	\
 	    avx_clear_upper(d);			\
 	    helper_##x##y(d, s);             \
 	}
+#endif
 
-AVX128_SIMPLE(ucomisd,)
-AVX128_SIMPLE(ucomiss,)
+#define AVX128_PASSTHROUGH(x,y)			\
+	void helper_##x##_avx(Reg *d, Reg *s) {	\
+	    helper_##x##y(d, s);             \
+	}
+
+AVX128_PASSTHROUGH(ucomiss,)
+AVX128_PASSTHROUGH(ucomisd,)
+AVX128_PASSTHROUGH(comisd,)
+AVX128_PASSTHROUGH(comiss,)
 
 void helper_pmuludq_avx(Reg *d, Reg *a, Reg *b)
 {
@@ -402,11 +411,6 @@ void glue(helper_addsubpd, ASUFFIX)(Reg *d, Reg *a, Reg *b)
     }
     AVX128_CLEAR_UPPER(d);
 }
-
-#define helper_ucomisd_avx helper_ucomisd_xmm
-#define helper_comisd_avx helper_comisd_xmm
-#define helper_comiss_avx helper_comiss_xmm
-#define helper_ucomiss_avx helper_ucomiss_xmm
 
 uint32_t glue(helper_movmskps, ASUFFIX)(Reg *s)
 {

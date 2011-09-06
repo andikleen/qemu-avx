@@ -41,7 +41,7 @@
 	AVX_ONLY(DEF_HELPER_3(glue(name,_avx), void, Reg, Reg, Reg))
 
 #define DEF_HELPER_AVX128_2OP(name, suffix)				\
-	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)	\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)		\
 	AVX_ONLY(DEF_HELPER_2(glue(name,_avx), void, Reg, Reg))
 
 #define DEF_HELPER_AVX256(name, suffix)					\
@@ -257,9 +257,9 @@ SSE_HELPER_CMP(cmpnle, FPU_CMPNLE)
 SSE_HELPER_CMP(cmpord, FPU_CMPORD)
 
 DEF_HELPER_AVX128_2OP(ucomiss,)
-DEF_HELPER_2(comiss, void, Reg, Reg)
+DEF_HELPER_AVX128_2OP(comiss,)
 DEF_HELPER_AVX128_2OP(ucomisd,)
-DEF_HELPER_2(comisd, void, Reg, Reg)
+DEF_HELPER_AVX128_2OP(comisd,)
 DEF_HELPER_1(movmskps, i32, Reg)
 DEF_HELPER_1(movmskps_avx, i32, Reg)
 DEF_HELPER_1(movmskps_256, i32, Reg)
