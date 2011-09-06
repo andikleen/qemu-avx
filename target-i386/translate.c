@@ -272,6 +272,15 @@ static inline void gen_op_andl_A0_ffff(void)
 #define REG_LH_OFFSET 4
 #endif
 
+static inline int is_long_mode(DisasContext *s)
+{
+#ifdef TARGET_X86_64
+	return s->lma;
+#else
+	return 0;
+#endif
+}
+	
 static inline void gen_op_mov_reg_v(int ot, int reg, TCGv t0)
 {
     switch(ot) {
@@ -3023,11 +3032,17 @@ static void *sse_op_table1[256][4] = {
 
 /* AVX 128bit versions of SSE ops, using 3op helpers */
 static void *avx_op_table1[256][4] = {
-    [0x10] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */
-    [0x11] = SSE_SPECIAL4,      /* movups, movupd, movss, movsd */ 
-    [0x12] = SSE_SPECIAL4,      /* movlps, movlpd, movsldup, movddup */
+    [0x10] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
+    [0x11] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
+    [0x12] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
     [0x14] = { gen_helper_punpckldq_avx, gen_helper_punpckldq_avx },
+    [0x15] = { gen_helper_punpckhdq_avx, gen_helper_punpckhqdq_avx },
+    [0x16] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd, movshdup */
+    [0x17] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
+
+    [0x28] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
+    [0x29] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
     [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
     [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, */
     [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
@@ -5759,7 +5774,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         break;
     case 0xc4: /* les Gv or VEX 3 byte */
 	b1 = ldub_code(s->pc);
-	if ((b1 & 0xb0) == 0xb0 && s->pe) {
+	if (is_long_mode(s) || !s->pe || (b1 >> 7) == 1) {
 	vex:
 	    s->pc++;
 
@@ -5773,7 +5788,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         goto do_lxx;
     case 0xc5: /* lds Gv or VEX 2 byte */
 	b1 = ldub_code(s->pc);
-        if ((b1 & 0x80) && s->pe)
+	if (is_long_mode(s) || !s->pe || (b1 >> 7) == 1)
 	    goto vex;
         op = R_DS;
         goto do_lxx;
