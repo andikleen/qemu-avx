@@ -3089,8 +3089,8 @@ static void *avx_op_table1_256[256][2] = {
     [0x17] = { SSE_SPECIAL, SSE_SPECIAL },  /* movhps, movhpd */
     [0x28] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
     [0x29] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
-    [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */
 #endif
+    [0x50] = { SSE_SPECIAL, SSE_SPECIAL }, /* movmskps, movmskpd */
     [0x51] = AVX256_FOP(sqrt),
     [0x52] = { gen_helper_rsqrtps_256, NULL },
     [0x53] = { gen_helper_rcpps_256, NULL },
@@ -3596,6 +3596,11 @@ static int gen_sse_op3a(DisasContext *s, int b, int b1, int rex_r, int l,
     return 0;
 }
 
+#define gen_3helpers(mode,name,args)			\
+	(mode == VEX256 ? gen_helper_##name##_256 :	\
+	 mode == VEX128 ? gen_helper_##name##_avx :	\
+	 gen_helper_##name) args
+
 static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r, 
 		       void *sse_op2, enum ssemode mode, int b1, int v)
 {
@@ -3801,7 +3806,6 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
             }
-	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));   	
             break;
         case 0x216: /* movshdup */
             if (mod != 3) {
@@ -3944,6 +3948,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x017: /* movhps */
         case 0x117: /* movhpd */
+		// XXX handle 3 op
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_st_env_A0_mode(mode, s->mem_index, 
@@ -3951,6 +3956,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             } else {
                 goto illegal_op;
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x71: /* shift mm, im */
         case 0x72:
@@ -3997,7 +4003,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             rm = (modrm & 7) | REX_B(s);
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, 
                              offsetof(CPUX86State,xmm_regs[rm]));
-            gen_helper_movmskps(cpu_tmp2_i32, cpu_ptr0);
+	    gen_3helpers(mode, movmskps, (cpu_tmp2_i32, cpu_ptr0));
             tcg_gen_extu_i32_tl(cpu_T[0], cpu_tmp2_i32);
             gen_op_mov_reg_T0(OT_LONG, reg);	    
             break;
@@ -4005,7 +4011,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             rm = (modrm & 7) | REX_B(s);
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, 
                              offsetof(CPUX86State,xmm_regs[rm]));
-            gen_helper_movmskpd(cpu_tmp2_i32, cpu_ptr0);
+	    gen_3helpers(mode, movmskpd, (cpu_tmp2_i32, cpu_ptr0));
             tcg_gen_extu_i32_tl(cpu_T[0], cpu_tmp2_i32);
             gen_op_mov_reg_T0(OT_LONG, reg);
             break;
