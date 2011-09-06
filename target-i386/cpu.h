@@ -554,12 +554,12 @@ typedef struct SegmentCache {
 } SegmentCache;
 
 typedef union {
-    uint8_t _b[32*2];
-    uint16_t _w[16*2];
-    uint32_t _l[8*2];
-    uint64_t _q[4*2];
-    float32 _s[8*2];
-    float64 _d[4*2];
+    uint8_t _b[32];
+    uint16_t _w[16];
+    uint32_t _l[8];
+    uint64_t _q[4];
+    float32 _s[8];
+    float64 _d[4];
 } XMMReg;
 
 typedef union {
