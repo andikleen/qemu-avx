@@ -3097,7 +3097,7 @@ static void *avx_op_table1_256[256][2] = {
     [0x54] = { gen_helper_pand_256, gen_helper_pand_256 }, /* andps, andpd */
     [0x55] = { gen_helper_pandn_256, gen_helper_pandn_256 },/* andnps, andnpd */
     [0x56] = { gen_helper_por_256, gen_helper_por_256 },  /* orps, orpd */
-    [0x57] = { gen_helper_pxor_avx, gen_helper_pxor_avx }, /* xorps, xorpd */
+    [0x57] = { gen_helper_pxor_256, gen_helper_pxor_256 }, /* xorps, xorpd */
     [0x58] = AVX256_FOP(add),
     [0x59] = AVX256_FOP(mul),
     [0x5a] = { gen_helper_cvtps2pd_256, gen_helper_cvtpd2ps_256 },
@@ -3709,6 +3709,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 		gen_op_mov_mode(mode, offsetof(CPUX86State,xmm_regs[reg]),
 				offsetof(CPUX86State,xmm_regs[rm]));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State, xmm_regs[reg]));
             break;
         case 0x210: /* movss xmm, ea */
             if (mod != 3) {
@@ -3724,6 +3725,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(0)));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State, xmm_regs[reg]));
             break;
         case 0x310: /* movsd xmm, ea */
             if (mod != 3) {
@@ -3732,13 +3734,12 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movl_T0_0();
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)));
                 tcg_gen_st32_tl(cpu_T[0], cpu_env, offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)));
-		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
-		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[rm]));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x012: /* movlps */
         case 0x112: /* movlpd */
@@ -3751,6 +3752,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(1)));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x212: /* movsldup */
 	    if (has_vreg(mode, v))
@@ -3794,6 +3796,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));	
             break;
         case 0x016: /* movhps */
         case 0x116: /* movhpd */
@@ -3806,6 +3809,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
             }
+	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x216: /* movshdup */
             if (mod != 3) {
@@ -3939,9 +3943,11 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x013: /* movlps */
         case 0x113: /* movlpd */
             if (mod != 3) {
+		// XXX 3op
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_st_env_A0_mode(mode, s->mem_index, 
 				   offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+		gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 goto illegal_op;
             }
@@ -4357,7 +4363,6 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
 	    if (mode >= VEX128) {
-		// XXX operand order
 		tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State,xmm_regs[v]));
 		((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1, cpu_ptr2);
 	    } else
