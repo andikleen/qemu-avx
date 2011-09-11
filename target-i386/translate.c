@@ -3070,10 +3070,10 @@ static void *avx_op_table1[256][4] = {
     [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
     [0x7c] = { gen_helper_haddpd_avx, gen_helper_haddps_avx },
     [0x7d] = { gen_helper_hsubpd_avx, gen_helper_hsubps_avx },
-
-    // XXX add more as ops_sse is updated
-
-    [0x6f] = { SSE_SPECIAL, SSE_SPECIAL }, /* movdqa, movdqu */
+    [0xd0] = { NULL, gen_helper_addsubpd_avx, NULL, gen_helper_addsubps_avx },
+    // xxx add more v*
+    // d6?
+    // e6
 };
 
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
@@ -3883,15 +3883,20 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x312: /* movddup */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
+		gen_ld_env_A0_mode(mode, s->mem_index, 
+				   offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
             } else {
                 rm = (modrm & 7) | REX_B(s);
-                gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
-                            offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
+                gen_op_mov_mode(mode,
+				offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
             }
             gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
-	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));	
+	    if (mode == VEX256) {
+		gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)) + 16,
+			    offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)) + 16);
+	    }
             break;
         case 0x016: /* movhps */
         case 0x116: /* movhpd */
