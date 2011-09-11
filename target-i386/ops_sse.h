@@ -1096,25 +1096,120 @@ void helper_ ## name ## sd (Reg *d, Reg *s)\
 void helper_ ## name ## sd_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
+    avx_clear_upper(d);\
 }
 
-#define FPU_CMPEQ(size, a, b) float ## size ## _eq(a, b, &env->sse_status) ? -1 : 0
-#define FPU_CMPLT(size, a, b) float ## size ## _lt(a, b, &env->sse_status) ? -1 : 0
-#define FPU_CMPLE(size, a, b) float ## size ## _le(a, b, &env->sse_status) ? -1 : 0
-#define FPU_CMPUNORD(size, a, b) float ## size ## _unordered_quiet(a, b, &env->sse_status) ? - 1 : 0
-#define FPU_CMPNEQ(size, a, b) float ## size ## _eq_quiet(a, b, &env->sse_status) ? 0 : -1
-#define FPU_CMPNLT(size, a, b) float ## size ## _lt(a, b, &env->sse_status) ? 0 : -1
-#define FPU_CMPNLE(size, a, b) float ## size ## _le(a, b, &env->sse_status) ? 0 : -1
-#define FPU_CMPORD(size, a, b) float ## size ## _unordered_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPEQ_OQ(size, a, b) \
+    float ## size ## _eq_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPLT_OS(size, a, b) \
+    float ## size ## _lt(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPLE_OS(size, a, b) \
+    float ## size ## _le(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPUNORD_Q(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNEQ_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _eq_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPNLT_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _lt(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPNLE_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _le(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPORD_Q(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPEQ_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _eq_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNGE_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _lt(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNGT_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _le(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPFALSE_OQ(size, a, b) \
+    TRUE ? 0 : -1 /* XXX */
+#define FPU_CMPNEQ_OQ(size, a, b) \
+    float ## size ## _eq_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPGE_OS(size, a, b) \
+    float ## size ## _lt(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPGT_OS(size, a, b) \
+    float ## size ## _le(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPTRUE_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    TRUE ? -1 : 0
+#define FPU_CMPEQ_OS(size, a, b) \
+    float ## size ## _eq(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPLT_OQ(size, a, b) \
+    float ## size ## _lt_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPLE_OQ(size, a, b) \
+    float ## size ## _le_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPUNORD_S(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNEQ_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _eq(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPNLT_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _lt_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPNLE_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _le_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPORD_S(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPEQ_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    float ## size ## _eq(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNGE_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _lt_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPNGT_UQ(size, a, b) \
+    float ## size ## _unordered_quiet(a, b, &env->sse_status) && \
+    float ## size ## _le_quiet(a, b, &env->sse_status) ? -1 : 0
+#define FPU_CMPFALSE_OS(size, a, b) \
+    TRUE ? 0 : -1
+#define FPU_CMPNEQ_OS(size, a, b) \
+    float ## size ## _eq(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPGE_OQ(size, a, b) \
+    float ## size ## _lt_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPGT_OQ(size, a, b) \
+    float ## size ## _le_quiet(a, b, &env->sse_status) ? 0 : -1
+#define FPU_CMPTRUE_US(size, a, b) \
+    float ## size ## _unordered(a, b, &env->sse_status) && \
+    TRUE ? -1 : 0
 
-SSE_HELPER_CMP(cmpeq, FPU_CMPEQ)
-SSE_HELPER_CMP(cmplt, FPU_CMPLT)
-SSE_HELPER_CMP(cmple, FPU_CMPLE)
-SSE_HELPER_CMP(cmpunord, FPU_CMPUNORD)
-SSE_HELPER_CMP(cmpneq, FPU_CMPNEQ)
-SSE_HELPER_CMP(cmpnlt, FPU_CMPNLT)
-SSE_HELPER_CMP(cmpnle, FPU_CMPNLE)
-SSE_HELPER_CMP(cmpord, FPU_CMPORD)
+SSE_HELPER_CMP(cmpeq_oq, FPU_CMPEQ_OQ)
+SSE_HELPER_CMP(cmplt_os, FPU_CMPLT_OS)
+SSE_HELPER_CMP(cmple_os, FPU_CMPLE_OS)
+SSE_HELPER_CMP(cmpunord_q, FPU_CMPUNORD_Q)
+SSE_HELPER_CMP(cmpneq_uq, FPU_CMPNEQ_UQ)
+SSE_HELPER_CMP(cmpnlt_us, FPU_CMPNLT_US)
+SSE_HELPER_CMP(cmpnle_us, FPU_CMPNLE_US)
+SSE_HELPER_CMP(cmpord_q, FPU_CMPORD_Q)
+SSE_HELPER_CMP(cmpeq_uq, FPU_CMPEQ_UQ)
+SSE_HELPER_CMP(cmpnge_us, FPU_CMPNGE_US)
+SSE_HELPER_CMP(cmpngt_us, FPU_CMPNGT_US)
+SSE_HELPER_CMP(cmpfalse_oq, FPU_CMPFALSE_OQ)
+SSE_HELPER_CMP(cmpneq_oq, FPU_CMPNEQ_OQ)
+SSE_HELPER_CMP(cmpge_os, FPU_CMPGE_OS)
+SSE_HELPER_CMP(cmpgt_os, FPU_CMPGT_OS)
+SSE_HELPER_CMP(cmptrue_uq, FPU_CMPTRUE_UQ)
+SSE_HELPER_CMP(cmpeq_os, FPU_CMPEQ_OS)
+SSE_HELPER_CMP(cmplt_oq, FPU_CMPLT_OQ)
+SSE_HELPER_CMP(cmple_oq, FPU_CMPLE_OQ)
+SSE_HELPER_CMP(cmpunord_s, FPU_CMPUNORD_S)
+SSE_HELPER_CMP(cmpneq_us, FPU_CMPNEQ_US)
+SSE_HELPER_CMP(cmpnlt_uq, FPU_CMPNLT_UQ)
+SSE_HELPER_CMP(cmpnle_uq, FPU_CMPNLE_UQ)
+SSE_HELPER_CMP(cmpord_s, FPU_CMPORD_S)
+SSE_HELPER_CMP(cmpeq_us, FPU_CMPEQ_US)
+SSE_HELPER_CMP(cmpnge_uq, FPU_CMPNGE_UQ)
+SSE_HELPER_CMP(cmpngt_uq, FPU_CMPNGT_UQ)
+SSE_HELPER_CMP(cmpfalse_os, FPU_CMPFALSE_OS)
+SSE_HELPER_CMP(cmpneq_os, FPU_CMPNEQ_OS)
+SSE_HELPER_CMP(cmpge_oq, FPU_CMPGE_OQ)
+SSE_HELPER_CMP(cmpgt_oq, FPU_CMPGT_OQ)
+SSE_HELPER_CMP(cmptrue_us, FPU_CMPTRUE_US)
 
 static const int comis_eflags[4] = {CC_C, CC_Z, 0, CC_Z | CC_P | CC_C};
 

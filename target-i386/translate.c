@@ -2933,7 +2933,7 @@ static void *sse_op_table1[256][4] = {
     [0x5e] = SSE_FOP(div),
     [0x5f] = SSE_FOP(max),
 
-    [0xc2] = SSE_FOP(cmpeq),
+    [0xc2] = SSE_FOP(cmpeq_oq),
     [0xc6] = { gen_helper_shufps, gen_helper_shufpd },
 
     [0x38] = { SSE_SPECIAL, SSE_SPECIAL, NULL, SSE_SPECIAL }, /* SSSE3/SSE4 */
@@ -3045,6 +3045,8 @@ static void *avx_op_table1[256][4] = {
     [0x29] = { SSE_SPECIAL, SSE_SPECIAL },  /* movaps, movapd */
     [0x2a] = SSE_SPECIAL4,      /* cvtpi2ps, cvtpi2pd, cvtsi2ss */
     [0x2b] = SSE_SPECIAL4,      /* movntps, movntpd, movntss, */
+    [0x2c] = SSE_SPECIAL4, /* cvttps2pi, cvttpd2pi, cvttsd2si, cvttss2si */
+
     [0x2d] = SSE_SPECIAL4,      /* cvtsd2si, cvtssss2ssi, cvttsd2si, cvtss2si, cvtsd2si */
     [0x2e] = { gen_helper_ucomiss_avx, gen_helper_ucomisd_avx },
     [0x2f] = { gen_helper_comiss, gen_helper_comisd },
@@ -3151,16 +3153,109 @@ static void *sse_op_table3[4 * 3] = {
     X86_64_ONLY(gen_helper_cvtsd2sq),
 };
 
-// need AVX
-static void *sse_op_table4[8][4] = {
-    SSE_FOP(cmpeq),
-    SSE_FOP(cmplt),
-    SSE_FOP(cmple),
-    SSE_FOP(cmpunord),
-    SSE_FOP(cmpneq),
-    SSE_FOP(cmpnlt),
-    SSE_FOP(cmpnle),
-    SSE_FOP(cmpord),
+static void *sse_op_table4[32][4] = {
+    [0x0] = SSE_FOP(cmpeq_oq),
+    [0x1] = SSE_FOP(cmplt_os),
+    [0x2] = SSE_FOP(cmple_os),
+    [0x3] = SSE_FOP(cmpunord_q),
+    [0x4] = SSE_FOP(cmpneq_uq),
+    [0x5] = SSE_FOP(cmpnlt_us),
+    [0x6] = SSE_FOP(cmpnle_us),
+    [0x7] = SSE_FOP(cmpord_q),
+    [0x8] = SSE_FOP(cmpeq_uq),
+    [0x9] = SSE_FOP(cmpnge_us),
+    [0xa] = SSE_FOP(cmpngt_us),
+    [0xb] = SSE_FOP(cmpfalse_oq),
+    [0xc] = SSE_FOP(cmpneq_oq),
+    [0xd] = SSE_FOP(cmpge_os),
+    [0xe] = SSE_FOP(cmpgt_os),
+    [0xf] = SSE_FOP(cmptrue_uq),
+    [0x10] = SSE_FOP(cmpeq_os),
+    [0x11] = SSE_FOP(cmplt_oq),
+    [0x12] = SSE_FOP(cmple_oq),
+    [0x13] = SSE_FOP(cmpunord_s),
+    [0x14] = SSE_FOP(cmpneq_us),
+    [0x15] = SSE_FOP(cmpnlt_uq),
+    [0x16] = SSE_FOP(cmpnle_uq),
+    [0x17] = SSE_FOP(cmpord_s),
+    [0x18] = SSE_FOP(cmpeq_us),
+    [0x19] = SSE_FOP(cmpnge_uq),
+    [0x1a] = SSE_FOP(cmpngt_uq),
+    [0x1b] = SSE_FOP(cmpfalse_os),
+    [0x1c] = SSE_FOP(cmpneq_os),
+    [0x1d] = SSE_FOP(cmpge_oq),
+    [0x1e] = SSE_FOP(cmpgt_oq),
+    [0x1f] = SSE_FOP(cmptrue_us),
+};
+
+static void *avx_op_table4[32][4] = {
+    [0x0] = AVX128_FOP(cmpeq_oq),
+    [0x1] = AVX128_FOP(cmplt_os),
+    [0x2] = AVX128_FOP(cmple_os),
+    [0x3] = AVX128_FOP(cmpunord_q),
+    [0x4] = AVX128_FOP(cmpneq_uq),
+    [0x5] = AVX128_FOP(cmpnlt_us),
+    [0x6] = AVX128_FOP(cmpnle_us),
+    [0x7] = AVX128_FOP(cmpord_q),
+    [0x8] = AVX128_FOP(cmpeq_uq),
+    [0x9] = AVX128_FOP(cmpnge_us),
+    [0xa] = AVX128_FOP(cmpngt_us),
+    [0xb] = AVX128_FOP(cmpfalse_oq),
+    [0xc] = AVX128_FOP(cmpneq_oq),
+    [0xd] = AVX128_FOP(cmpge_os),
+    [0xe] = AVX128_FOP(cmpgt_os),
+    [0xf] = AVX128_FOP(cmptrue_uq),
+    [0x10] = AVX128_FOP(cmpeq_os),
+    [0x11] = AVX128_FOP(cmplt_oq),
+    [0x12] = AVX128_FOP(cmple_oq),
+    [0x13] = AVX128_FOP(cmpunord_s),
+    [0x14] = AVX128_FOP(cmpneq_us),
+    [0x15] = AVX128_FOP(cmpnlt_uq),
+    [0x16] = AVX128_FOP(cmpnle_uq),
+    [0x17] = AVX128_FOP(cmpord_s),
+    [0x18] = AVX128_FOP(cmpeq_us),
+    [0x19] = AVX128_FOP(cmpnge_uq),
+    [0x1a] = AVX128_FOP(cmpngt_uq),
+    [0x1b] = AVX128_FOP(cmpfalse_os),
+    [0x1c] = AVX128_FOP(cmpneq_os),
+    [0x1d] = AVX128_FOP(cmpge_oq),
+    [0x1e] = AVX128_FOP(cmpgt_oq),
+    [0x1f] = AVX128_FOP(cmptrue_us),
+};
+
+static void *avx_op_table4_256[32][4] = {
+    [0x0] = AVX256_FOP(cmpeq_oq),
+    [0x1] = AVX256_FOP(cmplt_os),
+    [0x2] = AVX256_FOP(cmple_os),
+    [0x3] = AVX256_FOP(cmpunord_q),
+    [0x4] = AVX256_FOP(cmpneq_uq),
+    [0x5] = AVX256_FOP(cmpnlt_us),
+    [0x6] = AVX256_FOP(cmpnle_us),
+    [0x7] = AVX256_FOP(cmpord_q),
+    [0x8] = AVX256_FOP(cmpeq_uq),
+    [0x9] = AVX256_FOP(cmpnge_us),
+    [0xa] = AVX256_FOP(cmpngt_us),
+    [0xb] = AVX256_FOP(cmpfalse_oq),
+    [0xc] = AVX256_FOP(cmpneq_oq),
+    [0xd] = AVX256_FOP(cmpge_os),
+    [0xe] = AVX256_FOP(cmpgt_os),
+    [0xf] = AVX256_FOP(cmptrue_uq),
+    [0x10] = AVX256_FOP(cmpeq_os),
+    [0x11] = AVX256_FOP(cmplt_oq),
+    [0x12] = AVX256_FOP(cmple_oq),
+    [0x13] = AVX256_FOP(cmpunord_s),
+    [0x14] = AVX256_FOP(cmpneq_us),
+    [0x15] = AVX256_FOP(cmpnlt_uq),
+    [0x16] = AVX256_FOP(cmpnle_uq),
+    [0x17] = AVX256_FOP(cmpord_s),
+    [0x18] = AVX256_FOP(cmpeq_us),
+    [0x19] = AVX256_FOP(cmpnge_uq),
+    [0x1a] = AVX256_FOP(cmpngt_uq),
+    [0x1b] = AVX256_FOP(cmpfalse_os),
+    [0x1c] = AVX256_FOP(cmpneq_os),
+    [0x1d] = AVX256_FOP(cmpge_oq),
+    [0x1e] = AVX256_FOP(cmpgt_oq),
+    [0x1f] = AVX256_FOP(cmptrue_us),
 };
 
 static void *sse_op_table5[256] = {
@@ -4332,12 +4427,27 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0xc2:
             /* compare insns */
             val = ldub_code(s->pc++);
-            if (val >= 8)
-		goto illegal_op;
-            sse_op2 = sse_op_table4[val][b1];
+            if (val >= 32)
+		goto illegal_op;	    
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
-            ((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+	    if (b1 > 3)
+		goto illegal_op;
+	    if (mode >= VEX128) {
+		if (mode == VEX256) {
+		    if (b1 >= 2)
+			goto illegal_op;
+		    sse_op2 = avx_op_table4_256[val][b1];
+		} else {
+		    sse_op2 = avx_op_table4[val][b1];
+		}
+		tcg_gen_addi_ptr(cpu_ptr2, cpu_env, offsetof(CPUX86State,xmm_regs[v]));
+		((void (*)(TCGv_ptr, TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1, cpu_ptr2);
+		gen_avx_clearup_mode(mode, op1_offset);
+	    } else {
+		sse_op2 = sse_op_table4[val][b1];
+		((void (*)(TCGv_ptr, TCGv_ptr))sse_op2)(cpu_ptr0, cpu_ptr1);
+	    }
             break;
         case 0xf7:
             /* maskmov : we must prepare A0 */
@@ -4360,6 +4470,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             ((void (*)(TCGv_ptr, TCGv_ptr, TCGv))sse_op2)(cpu_ptr0, cpu_ptr1, cpu_A0);
             break;
         default:
+	    if (!sse_op2)
+		goto illegal_op;
             tcg_gen_addi_ptr(cpu_ptr0, cpu_env, op1_offset);
             tcg_gen_addi_ptr(cpu_ptr1, cpu_env, op2_offset);
 	    if (mode >= VEX128) {
@@ -4500,7 +4612,6 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 		    CODE64(s) ? gen_helper_vzeroupper_64() : gen_helper_vzeroupper_32();
 		return 0;
 	    }
-	    return 1;
 	}
 	return gen_sse_avx(s, op, pc_start, rex_r, sse_op2, mode, pp, v);
     case 2: /* 0f 38 */
