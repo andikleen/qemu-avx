@@ -571,6 +571,7 @@ typedef union {
 } MMXReg;
 
 #ifdef HOST_WORDS_BIGENDIAN
+/* XXX probably wrong now with avx */
 #define XMM_B(n) _b[15 - (n)]
 #define XMM_W(n) _w[7 - (n)]
 #define XMM_L(n) _l[3 - (n)]

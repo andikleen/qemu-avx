@@ -44,9 +44,9 @@
 	}
 #endif
 
-#define AVX128_PASSTHROUGH(x,y)			\
-	void helper_##x##_avx(Reg *d, Reg *s) {	\
-	    helper_##x##y(d, s);             \
+#define AVX128_PASSTHROUGH(x,y)				\
+	void helper_##x##_avx(Reg *d, Reg *a, Reg *b) {	\
+		helper_##x##y(d, a);			\
 	}
 
 AVX128_PASSTHROUGH(ucomiss,)
@@ -54,14 +54,14 @@ AVX128_PASSTHROUGH(ucomisd,)
 AVX128_PASSTHROUGH(comisd,)
 AVX128_PASSTHROUGH(comiss,)
 
-void helper_pmuludq_avx(Reg *d, Reg *a, Reg *b)
+void helper_pmuludq_avx(Reg *d, Reg *b, Reg *a)
 {
     d->Q(0) = (uint64_t)a->L(0) * (uint64_t)b->L(0);
     d->Q(1) = (uint64_t)a->L(2) * (uint64_t)b->L(2);
     avx_clear_upper(d);
 }
 
-void helper_pmaddwd_avx (Reg *d, Reg *a, Reg *b)
+void helper_pmaddwd_avx (Reg *d, Reg *b, Reg *a)
 {
     int i;
 
@@ -72,7 +72,7 @@ void helper_pmaddwd_avx (Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_psadbw_avx(Reg *d, Reg *a, Reg *b)
+void helper_psadbw_avx(Reg *d, Reg *b, Reg *a)
 {
     unsigned int val;
 
@@ -120,7 +120,7 @@ void helper_movq_mm_T0_avx(Reg *d, uint64_t val)
 
 // XXX imm
 #define PSHIFT_OP(name,op,field,type)			\
-void helper_ ## name ## _avx(Reg *d, Reg *a, Reg *b)	\
+void helper_ ## name ## _avx(Reg *d, Reg *b, Reg *a)	\
 {							\
     int shift;						\
     int i;						\
@@ -146,7 +146,7 @@ PSHIFT_OP(psrlq, >>, Q, uint64_t)
 PSHIFT_OP(psllq, <<, Q, uint64_t)
 #undef PSHIFT_OP
 
-void helper_psrldq_avx(Reg *d, Reg *a, Reg *b)
+void helper_psrldq_avx(Reg *d, Reg *b, Reg *a)
 {
     int shift, i;
 
@@ -160,7 +160,7 @@ void helper_psrldq_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_pslldq_avx(Reg *d, Reg *a, Reg *b)
+void helper_pslldq_avx(Reg *d, Reg *b, Reg *a)
 {
     int shift, i;
 
@@ -194,14 +194,14 @@ void glue(helper_cvtps2pd, ASUFFIX)(Reg *d, Reg *s)
 }
 
 #if OP == 128
-void helper_cvtss2sd_avx(Reg *d, Reg *a, Reg *b)
+void helper_cvtss2sd_avx(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_D(0) = float32_to_float64(b->XMM_S(0), &env->sse_status);
     d->Q(1) = a->Q(1);
     avx_clear_upper(d);
 }
 
-void helper_cvtsd2ss_avx(Reg *d, Reg *a, Reg *b)
+void helper_cvtsd2ss_avx(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_S(0) = float64_to_float32(b->XMM_D(0), &env->sse_status);
     d->XMM_S(1) = a->XMM_S(1);
@@ -354,7 +354,7 @@ void helper_insertq_i_avx(Reg *d, int index, int length)
 }
 #endif
 
-void glue(helper_haddps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_haddps, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_S(0) = a->XMM_S(0) + a->XMM_S(1);
     d->XMM_S(1) = a->XMM_S(2) + a->XMM_S(3);
@@ -363,14 +363,14 @@ void glue(helper_haddps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
     AVX128_CLEAR_UPPER(d);
 }
 
-void glue(helper_haddpd, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_haddpd, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_D(0) = a->XMM_D(0) + a->XMM_D(1);
     d->XMM_D(1) = b->XMM_D(0) + b->XMM_D(1);
     AVX128_CLEAR_UPPER(d);
 }
 
-void glue(helper_hsubps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_hsubps, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_S(0) = a->XMM_S(0) - a->XMM_S(1);
     d->XMM_S(1) = a->XMM_S(2) - a->XMM_S(3);
@@ -383,7 +383,7 @@ void glue(helper_hsubps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
     d->XMM_S(7) = b->XMM_S(6) - b->XMM_S(7));
 }
 
-void glue(helper_hsubpd, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_hsubpd, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     d->XMM_D(0) = a->XMM_D(0) - a->XMM_D(1);
     d->XMM_D(1) = b->XMM_D(0) - b->XMM_D(1);
@@ -392,7 +392,7 @@ void glue(helper_hsubpd, ASUFFIX)(Reg *d, Reg *a, Reg *b)
     d->XMM_D(3) = b->XMM_D(3) - b->XMM_D(3));
 }
 
-void glue(helper_addsubps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_addsubps, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     int i;
     for (i = 0; i < NUM_S; i += 2) {
@@ -402,7 +402,7 @@ void glue(helper_addsubps, ASUFFIX)(Reg *d, Reg *a, Reg *b)
     AVX128_CLEAR_UPPER(d);
 }
 
-void glue(helper_addsubpd, ASUFFIX)(Reg *d, Reg *a, Reg *b)
+void glue(helper_addsubpd, ASUFFIX)(Reg *d, Reg *b, Reg *a)
 {
     int i;
     for (i = 0; i < NUM_D; i += 2) {
@@ -442,7 +442,7 @@ uint32_t glue(helper_movmskpd, ASUFFIX)(Reg *s)
 
 #define helper_pmovmskb_avx helper_pmovmskb_xmm
 
-void helper_packsswb_avx (Reg *d, Reg *a, Reg *b)
+void helper_packsswb_avx (Reg *d, Reg *b, Reg *a)
 {
     d->B(0) = satsb((int16_t)a->W(0));
     d->B(1) = satsb((int16_t)a->W(1));
@@ -463,7 +463,7 @@ void helper_packsswb_avx (Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_packuswb_avx(Reg *d, Reg *a, Reg *b)
+void helper_packuswb_avx(Reg *d, Reg *b, Reg *a)
 {
     d->B(0) = satub((int16_t)a->W(0));
     d->B(1) = satub((int16_t)a->W(1));
@@ -484,7 +484,7 @@ void helper_packuswb_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_packssdw_avx(Reg *d, Reg *a, Reg *b)
+void helper_packssdw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = satsw(a->L(0));
     d->W(1) = satsw(a->L(1));
@@ -498,7 +498,7 @@ void helper_packssdw_avx(Reg *d, Reg *a, Reg *b)
 }
 
 #define UNPCK_OP_AVX(base_name, base)					\
-void helper_punpck ## base_name ## bw_avx(Reg *d, Reg *a, Reg *b)	\
+void helper_punpck ## base_name ## bw_avx(Reg *d, Reg *b, Reg *a)	\
 {									\
     d->B(0)  = a->B((base << (SHIFT + 2)) + 0);				\
     d->B(1)  = b->B((base << (SHIFT + 2)) + 0);				\
@@ -519,7 +519,7 @@ void helper_punpck ## base_name ## bw_avx(Reg *d, Reg *a, Reg *b)	\
     avx_clear_upper(d);							\
 }									\
 									\
-void helper_punpck ## base_name ## wd_avx(Reg *d, Reg *a, Reg *b)	\
+void helper_punpck ## base_name ## wd_avx(Reg *d, Reg *b, Reg *a)	\
 {									\
     d->W(0) = a->W((base << (SHIFT + 1)) + 0);				\
     d->W(1) = b->W((base << (SHIFT + 1)) + 0);				\
@@ -532,7 +532,7 @@ void helper_punpck ## base_name ## wd_avx(Reg *d, Reg *a, Reg *b)	\
     avx_clear_upper(d);							\
 }									\
 									\
-void helper_punpck ## base_name ## dq_avx(Reg *d, Reg *a, Reg *b)	\
+void helper_punpck ## base_name ## dq_avx(Reg *d, Reg *b, Reg *a)	\
 {									\
     d->L(0) = a->L((base << SHIFT) + 0);				\
     d->L(1) = b->L((base << SHIFT) + 0);				\
@@ -541,7 +541,7 @@ void helper_punpck ## base_name ## dq_avx(Reg *d, Reg *a, Reg *b)	\
     avx_clear_upper(d);							\
 }									\
 									\
-void helper_punpck ## base_name ## qdq_avx(Reg *d, Reg *a, Reg *b)	\
+void helper_punpck ## base_name ## qdq_avx(Reg *d, Reg *b, Reg *a)	\
 {									\
     d->Q(0) = a->Q(base);						\
     d->Q(1) = b->Q(base);						\
@@ -553,7 +553,7 @@ UNPCK_OP_AVX(h, 1)
 
 #undef UNPCK_OP_AVX
 
-void helper_pshufb_avx(Reg *d, Reg *a, Reg *b)
+void helper_pshufb_avx(Reg *d, Reg *b, Reg *a)
 {
     int i;
     for (i = 0; i < (8 << SHIFT); i++)
@@ -561,7 +561,7 @@ void helper_pshufb_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phaddw_avx(Reg *d, Reg *a, Reg *b)
+void helper_phaddw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = (int16_t)a->W(0) + (int16_t)a->W(1);
     d->W(1) = (int16_t)a->W(2) + (int16_t)a->W(3);
@@ -574,7 +574,7 @@ void helper_phaddw_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phaddd_avx(Reg *d, Reg *a, Reg *b)
+void helper_phaddd_avx(Reg *d, Reg *b, Reg *a)
 {
     d->L(0) = (int32_t)a->L(0) + (int32_t)a->L(1);
     d->L(1) = (int32_t)a->L(2) + (int32_t)a->L(3);
@@ -583,7 +583,7 @@ void helper_phaddd_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phaddsw_avx(Reg *d, Reg *a, Reg *b)
+void helper_phaddsw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = satsw((int16_t)a->W(0) + (int16_t)a->W(1));
     d->W(1) = satsw((int16_t)a->W(2) + (int16_t)a->W(3));
@@ -596,7 +596,7 @@ void helper_phaddsw_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_pmaddubsw_avx(Reg *d, Reg *a, Reg *b)
+void helper_pmaddubsw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = satsw((int8_t)b->B( 0) * (uint8_t)a->B( 0) +
                     (int8_t)b->B( 1) * (uint8_t)a->B( 1));
@@ -617,7 +617,7 @@ void helper_pmaddubsw_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phsubw_avx(Reg *d, Reg *a, Reg *b)
+void helper_phsubw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = (int16_t)a->W(0) - (int16_t)a->W(1);
     d->W(1) = (int16_t)a->W(2) - (int16_t)a->W(3);
@@ -630,7 +630,7 @@ void helper_phsubw_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phsubd_avx(Reg *d, Reg *a, Reg *b)
+void helper_phsubd_avx(Reg *d, Reg *b, Reg *a)
 {
     d->L(0) = (int32_t)a->L(0) - (int32_t)a->L(1);
     d->L(1) = (int32_t)a->L(2) - (int32_t)a->L(3);
@@ -639,7 +639,7 @@ void helper_phsubd_avx(Reg *d, Reg *a, Reg *b)
     avx_clear_upper(d);
 }
 
-void helper_phsubsw_avx(Reg *d, Reg *a, Reg *b)
+void helper_phsubsw_avx(Reg *d, Reg *b, Reg *a)
 {
     d->W(0) = satsw((int16_t)a->W(0) - (int16_t)a->W(1));
     d->W(1) = satsw((int16_t)a->W(2) - (int16_t)a->W(3));

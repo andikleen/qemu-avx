@@ -256,7 +256,7 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     )\
 }\
 AVX_ONLY(\
-void name ## _avx(Reg *d, Reg *a, Reg *b)\
+void name ## _avx(Reg *d, Reg *b, Reg *a)\
 {\
     d->B(0) = F(a->B(0), b->B(0));\
     d->B(1) = F(a->B(1), b->B(1));\
@@ -294,7 +294,7 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     )\
 }\
 AVX_ONLY(\
-void name##_avx(Reg *d, Reg *a,Reg *b)\
+void name##_avx(Reg *d, Reg *b,Reg *a)\
 {\
     d->W(0) = F(a->W(0), b->W(0));\
     d->W(1) = F(a->W(1), b->W(1));\
@@ -319,7 +319,7 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     )\
 }\
 AVX_ONLY(\
-void name ##_avx (Reg *d, Reg *a, Reg *b)\
+void name ##_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->L(0) = F(a->L(0), b->L(0));\
     d->L(1) = F(a->L(1), b->L(1));\
@@ -338,13 +338,13 @@ void glue(name, SUFFIX) (Reg *d, Reg *s)\
     )\
 }\
 AVX_ONLY(\
-void name ## _avx (Reg *d, Reg *a, Reg *b)\
+void name ## _avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->Q(0) = F(a->Q(0), b->Q(0));\
     d->Q(1) = F(a->Q(1), b->Q(1));\
     avx_clear_upper(d);\
 }\
-void name ## _256 (Reg *d, Reg *a, Reg *b)\
+void name ## _256 (Reg *d, Reg *b, Reg *a)\
 {\
     d->Q(0) = F(a->Q(0), b->Q(0));\
     d->Q(1) = F(a->Q(1), b->Q(1));\
@@ -649,7 +649,7 @@ void helper_ ## name ## sd (Reg *d, Reg *s)\
 {\
     d->XMM_D(0) = F(64, d->XMM_D(0), s->XMM_D(0));\
 }\
-void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ps_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
     d->XMM_S(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
@@ -657,7 +657,7 @@ void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
     d->XMM_S(3) = F(32, a->XMM_S(3), b->XMM_S(3));\
     avx_clear_upper(d);\
 }\
-void helper_ ## name ## ps_256 (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ps_256 (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
     d->XMM_S(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
@@ -669,20 +669,20 @@ void helper_ ## name ## ps_256 (Reg *d, Reg *a, Reg *b)\
     d->XMM_S(7) = F(32, a->XMM_S(7), b->XMM_S(7));\
 }\
 \
-void helper_ ## name ## ss_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ss_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_S(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
     d->XMM_S(1) = a->XMM_S(1);			  \
     d->XMM_D(1) = a->XMM_D(1);			  \
     avx_clear_upper(d);				  \
 }\
-void helper_ ## name ## pd_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## pd_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
     d->XMM_D(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
     avx_clear_upper(d);\
 }\
-void helper_ ## name ## pd_256 (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## pd_256 (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
     d->XMM_D(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
@@ -690,7 +690,7 @@ void helper_ ## name ## pd_256 (Reg *d, Reg *a, Reg *b)\
     d->XMM_D(3) = F(64, a->XMM_D(3), b->XMM_D(3));\
 }\
 \
-void helper_ ## name ## sd_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## sd_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_D(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
     d->XMM_D(1) = a->XMM_D(1);			  \
@@ -1040,7 +1040,7 @@ void helper_ ## name ## ps (Reg *d, Reg *s)\
     d->XMM_L(3) = F(32, d->XMM_S(3), s->XMM_S(3));\
 }\
 \
-void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ps_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_L(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
     d->XMM_L(1) = F(32, a->XMM_S(1), b->XMM_S(1));\
@@ -1049,7 +1049,7 @@ void helper_ ## name ## ps_avx (Reg *d, Reg *a, Reg *b)\
     avx_clear_upper(d);\
 }\
 \
-void helper_ ## name ## ps_256 (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ps_256 (Reg *d, Reg *b, Reg *a)\
 {\
     int i;\
     for (i = 0; i < 8; i++)\
@@ -1061,7 +1061,7 @@ void helper_ ## name ## ss (Reg *d, Reg *s)\
     d->XMM_L(0) = F(32, d->XMM_S(0), s->XMM_S(0));\
 }\
 \
-void helper_ ## name ## ss_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## ss_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_L(0) = F(32, a->XMM_S(0), b->XMM_S(0));\
     avx_clear_upper(d);\
@@ -1073,14 +1073,14 @@ void helper_ ## name ## pd (Reg *d, Reg *s)\
     d->XMM_Q(1) = F(64, d->XMM_D(1), s->XMM_D(1));\
 }\
 \
-void helper_ ## name ## pd_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## pd_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
     d->XMM_Q(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
     avx_clear_upper(d);\
 }\
 \
-void helper_ ## name ## pd_256 (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## pd_256 (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
     d->XMM_Q(1) = F(64, a->XMM_D(1), b->XMM_D(1));\
@@ -1093,7 +1093,7 @@ void helper_ ## name ## sd (Reg *d, Reg *s)\
     d->XMM_Q(0) = F(64, d->XMM_D(0), s->XMM_D(0));\
 }\
 \
-void helper_ ## name ## sd_avx (Reg *d, Reg *a, Reg *b)\
+void helper_ ## name ## sd_avx (Reg *d, Reg *b, Reg *a)\
 {\
     d->XMM_Q(0) = F(64, a->XMM_D(0), b->XMM_D(0));\
 }
