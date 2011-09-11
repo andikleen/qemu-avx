@@ -4197,8 +4197,9 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x32c: /* cvttsd2si */
         case 0x22d: /* cvtss2si */
         case 0x32d: /* cvtsd2si */
-	    if (has_vreg(mode, v))
-		return 1;
+	    /* Documentation says there should be a has_vreg check here,
+	     * but gcc/gas generate v == 0.
+	     */
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
