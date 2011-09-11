@@ -341,6 +341,7 @@ void cpu_dump_state(CPUArchState *env, FILE *f, fprintf_function cpu_fprintf,
                     int flags);
 void cpu_dump_statistics(CPUArchState *env, FILE *f, fprintf_function cpu_fprintf,
                          int flags);
+void fpu_dump_state(CPUArchState *env, FILE *f, fprintf_function cpu_fprintf);
 
 void QEMU_NORETURN cpu_abort(CPUArchState *env, const char *fmt, ...)
     GCC_FMT_ATTR(2, 3);
@@ -457,6 +458,7 @@ void run_on_cpu(CPUArchState *env, void (*func)(void *data), void *data);
 #define CPU_LOG_IOPORT     (1 << 7)
 #define CPU_LOG_TB_CPU     (1 << 8)
 #define CPU_LOG_RESET      (1 << 9)
+#define CPU_LOG_TB_FPU     (1 << 10)
 
 /* define log items */
 typedef struct CPULogItem {

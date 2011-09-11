@@ -174,7 +174,43 @@ done:
 #define DUMP_CODE_BYTES_TOTAL    50
 #define DUMP_CODE_BYTES_BACKWARD 20
 
-void cpu_dump_state(CPUX86State *env, FILE *f, fprintf_function cpu_fprintf,
+void fpu_dump_state(CPUArchState *env, FILE *f, fprintf_function cpu_fprintf)
+{
+    int i, j;
+    XMMReg empty;
+
+    cpu_synchronize_state(env);
+
+    memset(&empty, 0, sizeof(XMMReg));
+    for (i = 0; i < CPU_NB_REGS; i++) {
+	if (!memcmp(&env->xmm_regs[i], &empty, sizeof(XMMReg)))
+	    continue;
+	cpu_fprintf(f, "YMM%d =", i);
+	for (j = 0; j < 8; j++)
+	    cpu_fprintf(f, " %08x", env->xmm_regs[i].XMM_L(j));
+	cpu_fprintf(f, "\n");	
+    }
+
+    for (i = 0; i < CPU_NB_REGS; i++) {
+	if (!memcmp(&env->xmm_regs[i], &empty, sizeof(XMMReg)))
+	    continue;
+	cpu_fprintf(f, "YMM%d =", i);
+	for (j = 0; j < 8; j++)
+	    cpu_fprintf(f, " %f", (double)env->xmm_regs[i].XMM_S(j));
+	cpu_fprintf(f, "\n");	
+    }
+    
+    for (i = 0; i < CPU_NB_REGS; i++) {
+	if (!memcmp(&env->xmm_regs[i], &empty, sizeof(XMMReg)))
+	    continue;
+	cpu_fprintf(f, "YMM%d =", i);
+	for (j = 0; j < 4; j++)
+	    cpu_fprintf(f, " %f", (double)env->xmm_regs[i].XMM_D(j));
+	cpu_fprintf(f, "\n");
+    }        
+}
+
+void cpu_dump_state(CPUArchState *env, FILE *f, fprintf_function cpu_fprintf,
                     int flags)
 {
     int eflags, i, nb;

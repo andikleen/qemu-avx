@@ -52,6 +52,7 @@ extern int loglevel;
 
 /* cpu_dump_state() logging functions: */
 #define log_cpu_state(env, f) cpu_dump_state((env), logfile, fprintf, (f));
+#define log_fpu_state(env) fpu_dump_state((env), logfile, fprintf);
 #define log_cpu_state_mask(b, env, f) do {           \
       if (loglevel & (b)) log_cpu_state((env), (f)); \
   } while (0)

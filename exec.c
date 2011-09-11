@@ -1791,6 +1791,10 @@ const CPULogItem cpu_log_items[] = {
     { CPU_LOG_TB_CPU, "cpu",
       "show CPU state before block translation" },
 #ifdef TARGET_I386
+    { CPU_LOG_TB_FPU, "fpu",
+      "show FPU state before block translation" },
+#endif
+#ifdef TARGET_I386
     { CPU_LOG_PCALL, "pcall",
       "show protected mode far calls/returns/exceptions" },
     { CPU_LOG_RESET, "cpu_reset",

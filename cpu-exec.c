@@ -511,6 +511,11 @@ int cpu_exec(CPUArchState *env)
                     cpu_loop_exit(env);
                 }
 #if defined(DEBUG_DISAS) || defined(CONFIG_DEBUG_EXEC)
+#ifdef TARGET_I386
+		if (qemu_loglevel_mask(CPU_LOG_TB_FPU)) {
+		    log_fpu_state(env);
+		}
+#endif
                 if (qemu_loglevel_mask(CPU_LOG_TB_CPU)) {
                     /* restore flags in standard format */
 #if defined(TARGET_I386)
