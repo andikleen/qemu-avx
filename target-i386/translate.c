@@ -3910,16 +3910,22 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x016: /* movhps */
         case 0x116: /* movhpd */
+	    rm = (modrm & 7) | REX_B(s);       	
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)));
-            } else {
-                /* movlhps */
-                rm = (modrm & 7) | REX_B(s);
+            } else if (mode != VEX128) {
+		gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
+            } 
+
+	    if (mode == VEX128) {		
+                gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
+                            offsetof(CPUX86State,xmm_regs[v].XMM_Q(0)));
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
-            }
-	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
+		gen_avx_clearup(offsetof(CPUX86State,xmm_regs[reg]));
+	    }
             break;
         case 0x216: /* movshdup */
             if (mod != 3) {
