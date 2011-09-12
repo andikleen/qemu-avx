@@ -3411,7 +3411,7 @@ static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
 
 static inline int has_vreg(enum ssemode mode, int v)
 {
-    return (mode >= VEX128 && v != 0xf);
+    return (mode >= VEX128 && v != 0);
 }
 
 static int gen_sse_op38(DisasContext *s, int b, int b1, int rex_r, int l, 
@@ -3761,7 +3761,6 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             break;
         case 0x16e: /* movd xmm, ea */
-	    // XXX truncation rules
 #ifdef TARGET_X86_64
             if (s->dflag == 2) {
                 gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
@@ -3777,6 +3776,13 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 tcg_gen_trunc_tl_i32(cpu_tmp2_i32, cpu_T[0]);
                 gen_helper_movl_mm_T0_xmm(cpu_ptr0, cpu_tmp2_i32);
             }
+	    if (mode == VEX128) {
+		tcg_gen_movi_i32(cpu_tmp2_i32, 0);
+		tcg_gen_st_i32(cpu_tmp2_i32, cpu_env, 
+			       offsetof(CPUX86State,xmm_regs[reg]) + 4);
+		gen_xmm_clearup(offsetof(CPUX86State,xmm_regs[reg]));
+		gen_avx_clearup(offsetof(CPUX86State,xmm_regs[reg]));
+	    }
             break;
         case 0x6f: /* movq mm, ea */
             if (mod != 3) {
@@ -3789,6 +3795,10 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 tcg_gen_st_i64(cpu_tmp1_i64, cpu_env,
                                offsetof(CPUX86State,fpregs[reg].mmx));
             }
+	    if (mode == VEX128) {
+		gen_xmm_clearup(offsetof(CPUX86State,xmm_regs[reg]));
+		gen_avx_clearup(offsetof(CPUX86State,xmm_regs[reg]));
+	    }	    
             break;
         case 0x010: /* movups */
         case 0x110: /* movupd */
@@ -3916,6 +3926,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
 		if (mode == VEX256) {
+		    // XXX
 		}
             } else {
                 rm = (modrm & 7) | REX_B(s);
@@ -3924,6 +3935,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(3)));
 		if (mode == VEX256) { 
+		    // XXX
 
 		}
             }
@@ -4202,9 +4214,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x32c: /* cvttsd2si */
         case 0x22d: /* cvtss2si */
         case 0x32d: /* cvtsd2si */
-	    /* Documentation says there should be a has_vreg check here,
-	     * but gcc/gas generate v == 0.
-	     */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             ot = (s->dflag == 2) ? OT_QUAD : OT_LONG;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
