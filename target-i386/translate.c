@@ -3930,7 +3930,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x216: /* movshdup */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
+                gen_ld_env_A0_mode(mode, s->mem_index, 
+				   offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)),
