@@ -4569,14 +4569,14 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 #endif
 
 #ifdef TARGET_X86_64
-    rex_r = ((~b1 & 0x80) >> 3);
+    rex_r = ((~b1 & 0x80) >> 4);
     s->rex_x = 0;
     REX_B(s) = 0;
 #endif
     if (b == 0xc4) { /* 3 byte */
 #ifdef TARGET_X86_64
 	s->rex_x = (~b1 & 0x40) >> 3;
-	s->rex_b = (~b1 & 0x20) >> 1;
+	s->rex_b = (~b1 & 0x20) >> 2;
 #endif
 	b2 = ldub_code(s->pc++);
 	pp = b2 & 3;
