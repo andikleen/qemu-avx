@@ -3032,9 +3032,9 @@ static void *sse_op_table1[256][4] = {
 
 /* AVX 128bit versions of SSE ops, using 3op helpers */
 static void *avx_op_table1[256][4] = {
-    [0x10] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
-    [0x11] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd, movss, movsd */
-    [0x12] = { SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
+    [0x10] = SSE_SPECIAL4, /* movups, movupd, movss, movsd */
+    [0x11] = SSE_SPECIAL4, /* movups, movupd, movss, movsd */
+    [0x12] = SSE_SPECIAL4, /* movlps, movlpd, movsldup, movddup */
     [0x13] = { SSE_SPECIAL, SSE_SPECIAL },  /* movlps, movlpd */
     [0x14] = { gen_helper_punpckldq_avx, gen_helper_punpckldq_avx },
     [0x15] = { gen_helper_punpckhdq_avx, gen_helper_punpckhqdq_avx },
@@ -3924,10 +3924,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x216: /* movshdup */
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
-                gen_ldo_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
-		if (mode == VEX256) {
-		    // XXX
-		}
+                gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
             } else {
                 rm = (modrm & 7) | REX_B(s);
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)),
@@ -3935,14 +3932,22 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)),
                             offsetof(CPUX86State,xmm_regs[rm].XMM_L(3)));
 		if (mode == VEX256) { 
-		    // XXX
-
+		    gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(5)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_L(5)));
+		    gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(7)),
+				offsetof(CPUX86State,xmm_regs[rm].XMM_L(7)));    
 		}
             }
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(0)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(1)));
             gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(2)),
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)));
+	    if (mode == VEX256) { 
+		gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(4)),
+			    offsetof(CPUX86State,xmm_regs[rm].XMM_L(5)));
+		gen_op_movl(offsetof(CPUX86State,xmm_regs[reg].XMM_L(6)),
+			    offsetof(CPUX86State,xmm_regs[rm].XMM_L(7)));    
+	    }
 	    gen_avx_clearup_mode(mode, offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x178:
