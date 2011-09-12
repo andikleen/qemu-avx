@@ -28,6 +28,8 @@
 #include <sys/ucontext.h>
 #include <sys/mman.h>
 
+#define QEMU_PACKED __attribute__((packed))
+
 #if !defined(__x86_64__)
 //#define TEST_VM86
 #define TEST_SEGS
@@ -1827,7 +1829,7 @@ void test_exceptions(void)
     printf("lock nop exception:\n");
     if (setjmp(jmp_env) == 0) {
         /* now execute an invalid instruction */
-        asm volatile("lock nop");
+        asm volatile("lock ; nop");
     }
 
     printf("INT exception:\n");
