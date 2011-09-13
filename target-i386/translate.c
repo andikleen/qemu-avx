@@ -4492,7 +4492,7 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0xf7:
             /* maskmov : we must prepare A0 */
-            if (mod != 3)
+            if (mod != 3 || mode > XMM)
 		goto illegal_op;
 #ifdef TARGET_X86_64
             if (s->aflag == 2) {
