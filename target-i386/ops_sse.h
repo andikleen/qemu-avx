@@ -1889,141 +1889,54 @@ void glue(helper_phminposuw, SUFFIX) (Reg *d, Reg *s)
     d->W(0) = s->W(idx);
 }
 
-void glue(helper_roundps, SUFFIX) (Reg *d, Reg *s, uint32_t mode)
-{
-    signed char prev_rounding_mode;
-
-    prev_rounding_mode = env->sse_status.float_rounding_mode;
-    if (!(mode & (1 << 2)))
-        switch (mode & 3) {
-        case 0:
-            set_float_rounding_mode(float_round_nearest_even, &env->sse_status);
-            break;
-        case 1:
-            set_float_rounding_mode(float_round_down, &env->sse_status);
-            break;
-        case 2:
-            set_float_rounding_mode(float_round_up, &env->sse_status);
-            break;
-        case 3:
-            set_float_rounding_mode(float_round_to_zero, &env->sse_status);
-            break;
-        }
-
-    d->XMM_S(0) = float32_round_to_int(s->XMM_S(0), &env->sse_status);
-    d->XMM_S(1) = float32_round_to_int(s->XMM_S(1), &env->sse_status);
-    d->XMM_S(2) = float32_round_to_int(s->XMM_S(2), &env->sse_status);
-    d->XMM_S(3) = float32_round_to_int(s->XMM_S(3), &env->sse_status);
-
-#if 0 /* TODO */
-    if (mode & (1 << 3))
-        set_float_exception_flags(
-                        get_float_exception_flags(&env->sse_status) &
-                        ~float_flag_inexact,
-                        &env->sse_status);
-#endif
-    env->sse_status.float_rounding_mode = prev_rounding_mode;
+#define HELPER_ROUND(name,num,field,e,sz)	\
+void name (Reg *d, Reg *s, uint32_t mode)	\
+{									\
+    signed char prev_rounding_mode;					\
+    int i;								\
+									\
+    prev_rounding_mode = env->sse_status.float_rounding_mode;		\
+    if (!(mode & (1 << 2)))						\
+        switch (mode & 3) {						\
+        case 0:								\
+            set_float_rounding_mode(float_round_nearest_even, &env->sse_status); \
+            break;							\
+        case 1:								\
+            set_float_rounding_mode(float_round_down, &env->sse_status); \
+            break;							\
+        case 2:								\
+            set_float_rounding_mode(float_round_up, &env->sse_status);	\
+            break;							\
+        case 3:								\
+            set_float_rounding_mode(float_round_to_zero, &env->sse_status); \
+            break;							\
+        }								\
+									\
+    for (i = 0; i < num; i++)						\
+	    d->field(i) = float##sz##_round_to_int(s->field(i), &env->sse_status); \
+									\
+    /* TODO */								\
+    /*if (mode & (1 << 3))						\
+        set_float_exception_flags(					\
+                        get_float_exception_flags(&env->sse_status) &	\
+                        ~float_flag_inexact,				\
+                        &env->sse_status); */				\
+    env->sse_status.float_rounding_mode = prev_rounding_mode;		\
+    e;									\
 }
 
-void glue(helper_roundpd, SUFFIX) (Reg *d, Reg *s, uint32_t mode)
-{
-    signed char prev_rounding_mode;
+HELPER_ROUND(helper_roundss_xmm, 1, XMM_S, , 32)
+HELPER_ROUND(helper_roundsd_xmm, 1, XMM_D, , 64)
+HELPER_ROUND(helper_roundpd_xmm, 2, XMM_D, , 64)
+HELPER_ROUND(helper_roundps_xmm, 4, XMM_S, , 32)
 
-    prev_rounding_mode = env->sse_status.float_rounding_mode;
-    if (!(mode & (1 << 2)))
-        switch (mode & 3) {
-        case 0:
-            set_float_rounding_mode(float_round_nearest_even, &env->sse_status);
-            break;
-        case 1:
-            set_float_rounding_mode(float_round_down, &env->sse_status);
-            break;
-        case 2:
-            set_float_rounding_mode(float_round_up, &env->sse_status);
-            break;
-        case 3:
-            set_float_rounding_mode(float_round_to_zero, &env->sse_status);
-            break;
-        }
+HELPER_ROUND(helper_roundss_avx, 1, XMM_S, avx_clear_upper(d), 32)
+HELPER_ROUND(helper_roundsd_avx, 1, XMM_D, avx_clear_upper(d), 64)
+HELPER_ROUND(helper_roundpd_avx, 2, XMM_D, avx_clear_upper(d), 64)
+HELPER_ROUND(helper_roundps_avx, 4, XMM_S, avx_clear_upper(d), 32)
 
-    d->XMM_D(0) = float64_round_to_int(s->XMM_D(0), &env->sse_status);
-    d->XMM_D(1) = float64_round_to_int(s->XMM_D(1), &env->sse_status);
-
-#if 0 /* TODO */
-    if (mode & (1 << 3))
-        set_float_exception_flags(
-                        get_float_exception_flags(&env->sse_status) &
-                        ~float_flag_inexact,
-                        &env->sse_status);
-#endif
-    env->sse_status.float_rounding_mode = prev_rounding_mode;
-}
-
-void glue(helper_roundss, SUFFIX) (Reg *d, Reg *s, uint32_t mode)
-{
-    signed char prev_rounding_mode;
-
-    prev_rounding_mode = env->sse_status.float_rounding_mode;
-    if (!(mode & (1 << 2)))
-        switch (mode & 3) {
-        case 0:
-            set_float_rounding_mode(float_round_nearest_even, &env->sse_status);
-            break;
-        case 1:
-            set_float_rounding_mode(float_round_down, &env->sse_status);
-            break;
-        case 2:
-            set_float_rounding_mode(float_round_up, &env->sse_status);
-            break;
-        case 3:
-            set_float_rounding_mode(float_round_to_zero, &env->sse_status);
-            break;
-        }
-
-    d->XMM_S(0) = float32_round_to_int(s->XMM_S(0), &env->sse_status);
-
-#if 0 /* TODO */
-    if (mode & (1 << 3))
-        set_float_exception_flags(
-                        get_float_exception_flags(&env->sse_status) &
-                        ~float_flag_inexact,
-                        &env->sse_status);
-#endif
-    env->sse_status.float_rounding_mode = prev_rounding_mode;
-}
-
-void glue(helper_roundsd, SUFFIX) (Reg *d, Reg *s, uint32_t mode)
-{
-    signed char prev_rounding_mode;
-
-    prev_rounding_mode = env->sse_status.float_rounding_mode;
-    if (!(mode & (1 << 2)))
-        switch (mode & 3) {
-        case 0:
-            set_float_rounding_mode(float_round_nearest_even, &env->sse_status);
-            break;
-        case 1:
-            set_float_rounding_mode(float_round_down, &env->sse_status);
-            break;
-        case 2:
-            set_float_rounding_mode(float_round_up, &env->sse_status);
-            break;
-        case 3:
-            set_float_rounding_mode(float_round_to_zero, &env->sse_status);
-            break;
-        }
-
-    d->XMM_D(0) = float64_round_to_int(s->XMM_D(0), &env->sse_status);
-
-#if 0 /* TODO */
-    if (mode & (1 << 3))
-        set_float_exception_flags(
-                        get_float_exception_flags(&env->sse_status) &
-                        ~float_flag_inexact,
-                        &env->sse_status);
-#endif
-    env->sse_status.float_rounding_mode = prev_rounding_mode;
-}
+HELPER_ROUND(helper_roundpd_256, 4, XMM_D, , 64)
+HELPER_ROUND(helper_roundps_256, 8, XMM_S, , 32)
 
 #define FBLENDP(d, s, m) m ? s : d
 SSE_HELPER_I(helper_blendps, L, 4, FBLENDP)

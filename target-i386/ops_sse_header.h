@@ -54,6 +54,14 @@
 	AVX_ONLY(DEF_HELPER_2(glue(name,_avx), void, Reg, Reg))	\
 	AVX_ONLY(DEF_HELPER_2(glue(name,_256), void, Reg, Reg))
 
+#define DEF_HELPER_AVX128_3(name, suffix, a, b, c, d)		\
+	DEF_HELPER_3(glue(name, suffix), a, b, c, d)		\
+	AVX_ONLY(DEF_HELPER_3(glue(name,_avx), a, b, c, d))
+
+#define DEF_HELPER_AVX256_3(name, suffix, a, b, c, d)		\
+	DEF_HELPER_AVX128_3(name, suffix, a, b, c, d)	\
+	AVX_ONLY(DEF_HELPER_3(glue(name,_256), a, b, c, d))
+
 DEF_HELPER_AVX128(psrlw,SUFFIX)
 DEF_HELPER_AVX128(psraw,SUFFIX)
 DEF_HELPER_AVX128(psllw,SUFFIX)
@@ -381,10 +389,10 @@ DEF_HELPER_AVX128(pmaxuw, SUFFIX)
 DEF_HELPER_AVX128(pmaxud, SUFFIX)
 DEF_HELPER_AVX128(pmulld, SUFFIX)
 DEF_HELPER_2(glue(phminposuw, SUFFIX), void, Reg, Reg)
-DEF_HELPER_3(glue(roundps, SUFFIX), void, Reg, Reg, i32)
-DEF_HELPER_3(glue(roundpd, SUFFIX), void, Reg, Reg, i32)
-DEF_HELPER_3(glue(roundss, SUFFIX), void, Reg, Reg, i32)
-DEF_HELPER_3(glue(roundsd, SUFFIX), void, Reg, Reg, i32)
+DEF_HELPER_AVX256_3(roundps, SUFFIX, void, Reg, Reg, i32)
+DEF_HELPER_AVX256_3(roundpd, SUFFIX, void, Reg, Reg, i32)
+DEF_HELPER_AVX128_3(roundss, SUFFIX, void, Reg, Reg, i32)
+DEF_HELPER_AVX128_3(roundsd, SUFFIX, void, Reg, Reg, i32)
 DEF_HELPER_3(glue(blendps, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(blendpd, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(pblendw, SUFFIX), void, Reg, Reg, i32)

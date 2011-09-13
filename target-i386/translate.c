@@ -3286,18 +3286,14 @@ static void *sse_op_table5[256] = {
 };
 
 struct sse_op_helper_s {
-    void *op[2]; 
-    uint32_t ext_mask;
+    void *op[2]; uint32_t ext_mask;
 };
 #define MMX_OP3(x) \
     { gen_helper_ ## x ## _mmx, gen_helper_ ## x ## _xmm }
-#define AVX_OP3(x) { NULL, gen_helper_ ## x ## _xmm }
 
 #define SSSE3_OP(x) { MMX_OP3(x), CPUID_EXT_SSSE3}
-#define SSE41_OP(x) { AVX_OP3(x), CPUID_EXT_SSE41 }
-#define SSE41_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE41 }
-#define SSE42_OP(x) { AVX_OP3(x), CPUID_EXT_SSE42 }
-#define SSE42_OP256(x) { AVX_OP3(x), CPUID_EXT_SSE42 }
+#define SSE41_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE41 }
+#define SSE42_OP(x) { { NULL, gen_helper_ ## x ## _xmm }, CPUID_EXT_SSE42 }
 #define SSE41_SPECIAL { { NULL, SSE_SPECIAL }, CPUID_EXT_SSE41 }
 
 /* 0f 38 */
@@ -3388,11 +3384,22 @@ static struct sse_op_helper_s sse_op_table7[256] = {
 };
 
 static void *avx_op_table7[256][2] = {
-    /* write me */
+    [0x08] = { NULL, gen_helper_roundps_avx },
+    [0x09] = { NULL, gen_helper_roundpd_avx },
+    [0x0a] = { NULL, gen_helper_roundss_avx },
+    [0x0b] = { NULL, gen_helper_roundsd_avx },
+#if 0
+    [0x0c] = { NULL, gen_helper_blendps_avx },
+    [0x0d] = { NULL, gen_helper_blendpd_avx },
+#endif
+    /* XXX finish me */
 };
 
 static void *avx_op_table7_256[256][2] = {
-    /* write me */
+    [0x08] = { NULL, gen_helper_roundps_256 },
+    [0x09] = { NULL, gen_helper_roundpd_256 },
+
+    /* XXX finish me */
 };
 
 static inline int pre_sse_checks(DisasContext *s, target_ulong pc_start)
