@@ -3700,9 +3700,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 		       void *sse_op2, enum ssemode mode, int b1, int v)
 {
     int op1_offset, op2_offset, val, ot;
-    int modrm, mod, rm, reg, reg_addr, offset_addr;
+    int modrm, mod, rm = 0, reg, reg_addr, offset_addr;
 
-    // XXX use v
     modrm = ldub_code(s->pc++);
     reg = ((modrm >> 3) & 7);
     if (mode >= XMM)
@@ -3733,6 +3732,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x22b: /* movntss */
         case 0x32b: /* movntsd */
+	    /* XXX: what instructions are that? */
+	    /* XXX AVX? */
             if (mod == 3)
                 goto illegal_op;
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
@@ -3746,6 +3747,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             break;
         case 0x6e: /* movd mm, ea */
+	    if (mode >= XMM)
+		goto illegal_op;
 #ifdef TARGET_X86_64
             if (s->dflag == 2) {
                 gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
@@ -3761,6 +3764,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             }
             break;
         case 0x16e: /* movd xmm, ea */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
 #ifdef TARGET_X86_64
             if (s->dflag == 2) {
                 gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
@@ -3785,6 +3790,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    }
             break;
         case 0x6f: /* movq mm, ea */
+	    if (mode >= XMM)
+		goto illegal_op;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,fpregs[reg].mmx));
@@ -3795,10 +3802,6 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
                 tcg_gen_st_i64(cpu_tmp1_i64, cpu_env,
                                offsetof(CPUX86State,fpregs[reg].mmx));
             }
-	    if (mode == VEX128) {
-		gen_xmm_clearup(offsetof(CPUX86State,xmm_regs[reg]));
-		gen_avx_clearup(offsetof(CPUX86State,xmm_regs[reg]));
-	    }	    
             break;
         case 0x010: /* movups */
         case 0x110: /* movupd */
@@ -3806,6 +3809,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
         case 0x128: /* movapd */
         case 0x16f: /* movdqa xmm, ea */
         case 0x26f: /* movdqu xmm, ea */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ld_env_A0_mode(mode, s->mem_index, offsetof(CPUX86State,xmm_regs[reg]));
@@ -3817,6 +3822,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    gen_avx_clearup_mode(mode, offsetof(CPUX86State, xmm_regs[reg]));
             break;
         case 0x210: /* movss xmm, ea */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_op_ld_T0_A0(OT_LONG + s->mem_index);
@@ -3833,6 +3840,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
 	    gen_avx_clearup_mode(mode, offsetof(CPUX86State, xmm_regs[reg]));
             break;
         case 0x310: /* movsd xmm, ea */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
@@ -3848,6 +3857,8 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x012: /* movlps */
         case 0x112: /* movlpd */
+	    if (has_vreg(mode, v))
+		goto illegal_op;
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)));
@@ -3910,16 +3921,17 @@ static int gen_sse_avx(DisasContext *s, int b, target_ulong pc_start, int rex_r,
             break;
         case 0x016: /* movhps */
         case 0x116: /* movhpd */
-	    rm = (modrm & 7) | REX_B(s);       	
             if (mod != 3) {
                 gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
                 gen_ldq_env_A0(s->mem_index, offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)));
             } else if (mode != VEX128) {
+		rm = (modrm & 7) | REX_B(s);
 		gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
 				offsetof(CPUX86State,xmm_regs[rm].XMM_Q(0)));
             } 
 
-	    if (mode == VEX128) {		
+	    if (mode == VEX128) {
+		rm = (modrm & 7) | REX_B(s);	
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(0)),
                             offsetof(CPUX86State,xmm_regs[v].XMM_Q(0)));
                 gen_op_movq(offsetof(CPUX86State,xmm_regs[reg].XMM_Q(1)),
@@ -4581,7 +4593,7 @@ static int gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
 static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, target_ulong pc_start)
 {
     unsigned b2, mm, pp, v;
-    int rex_r, op;
+    int rex_r = 0, op;
     void *sse_op2;
     int l;
     enum ssemode mode;
@@ -4591,6 +4603,7 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	return 1;
 #endif
 
+    rex_r = 0;
 #ifdef TARGET_X86_64
     rex_r = ((~b1 & 0x80) >> 4);
     s->rex_x = 0;
@@ -4608,7 +4621,7 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	    s->dflag = 2;
 	l = b2 & 0x4;
 	v = ~(b2 >> 3) & 0xf;
-    } else if (b == 0xc5) { /* 2 byte */
+    } else { /* 2 byte */
 	pp = b1 & 3; /* 0: none, 1: 66, 2: f3, 3: f2 */
 	mm = 1;
 	l = b1 & 0x4;
