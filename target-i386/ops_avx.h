@@ -10,9 +10,11 @@
 #if OP == 256
 #define AVX256_OR_CLEAR(d, ...) __VA_ARGS__
 #define ASUFFIX _256
+#define NUM_Q 4
 #define NUM_S 8
 #define NUM_L 8
 #define NUM_D 4
+#define NUM_B 32
 #define AVX128_CLEAR_UPPER(d)
 #define AVX128_ONLY(...)
 #define AVX256_ONLY(...) __VA_ARGS__
@@ -20,9 +22,11 @@
 #else
 #define AVX256_OR_CLEAR(d, ...) avx_clear_upper(d);
 #define ASUFFIX _avx
+#define NUM_Q 2
 #define NUM_S 4
 #define NUM_L 4
 #define NUM_D 2
+#define NUM_B 16
 #define AVX128_CLEAR_UPPER(d) avx_clear_upper(d)
 #define AVX128_ONLY(...) __VA_ARGS__
 #define AVX256_ONLY(...)
@@ -75,26 +79,15 @@ void helper_pmaddwd_avx (Reg *d, Reg *b, Reg *a)
 void helper_psadbw_avx(Reg *d, Reg *b, Reg *a)
 {
     unsigned int val;
+    int i;
 
     val = 0;
-    val += abs1(a->B(0) - b->B(0));
-    val += abs1(a->B(1) - b->B(1));
-    val += abs1(a->B(2) - b->B(2));
-    val += abs1(a->B(3) - b->B(3));
-    val += abs1(a->B(4) - b->B(4));
-    val += abs1(a->B(5) - b->B(5));
-    val += abs1(a->B(6) - b->B(6));
-    val += abs1(a->B(7) - b->B(7));
+    for (i = 0; i < NUM_B/2; i++)
+	val += abs1(a->B(i) - b->B(i));
     d->Q(0) = val;
     val = 0;
-    val += abs1(a->B(8) - b->B(8));
-    val += abs1(a->B(9) - b->B(9));
-    val += abs1(a->B(10) - b->B(10));
-    val += abs1(a->B(11) - b->B(11));
-    val += abs1(a->B(12) - b->B(12));
-    val += abs1(a->B(13) - b->B(13));
-    val += abs1(a->B(14) - b->B(14));
-    val += abs1(a->B(15) - b->B(15));
+    for (i = 0; i < NUM_B/2; i++)
+	val += abs1(a->B(8 + i) - b->B(8 + i));
     d->Q(1) = val;
     avx_clear_upper(d);
 }
@@ -659,27 +652,58 @@ void helper_phsubsw_avx(Reg *d, Reg *b, Reg *a)
 }
 #endif
 
-#if 0
-// xxx can we pass 64bit?
-void glue(helper_vbroadcastsd, ASUFFIX)(Reg *d, uint64_t m)
+void glue(helper_broadcastsd, ASUFFIX)(Reg *d, uint64_t m)
 {
-	d->Q(0) = m;
-	d->Q(1) = m;
-	AVX256_OR_CLEAR(d, d->Q(2) = d->Q(3) = m);
+    int i;
+    for (i = 0; i < NUM_Q; i++)
+	d->Q(i) = m;	
+    AVX128_CLEAR_UPPER(d);
 }
 
-void glue(helper_vbroadcastss, ASUFFIX)(Reg *d, uint32_t m)
+void glue(helper_broadcastss, ASUFFIX)(Reg *d, uint32_t m)
 {
-	d->L(0) = m;
-	d->L(1) = m;
-	d->L(2) = m;
-	d->L(3) = m;
-	AVX256_OR_CLEAR(d, d->L(4) = d->L(5) = d->L(6) = d->L(7) = m);
+    int i;
+    for (i = 0; i < NUM_L; i++)
+	d->L(i) = m;
+    AVX128_CLEAR_UPPER(d);
 }
-#endif
 
 // XXX 128 bit input
 
+#define SSE_HELPER_V_AVX(name, elem, num, F)				\
+    void glue(name, ASUFFIX)(Reg *d, Reg *b, Reg *a, Reg *m)		\
+    {									\
+	int i;								\
+	for (i = 0; i < num; i++)					\
+	    d->elem(i) = F(a->elem(0), b->elem(0), m->elem(i));		\
+        AVX128_CLEAR_UPPER(d);						\
+    }
+
+#define FBLENDVB(d, s, m)  (1 & 0x80) ? 2 : 3
+#define FBLENDVPS(d, s, m) (1 & 0x80000000) ? 2 : 3
+#define FBLENDVPD(d, s, m) (1 & 0x8000000000000000LL) ? 2 : 3
+
+SSE_HELPER_V_AVX(helper_pblendvb, B, NUM_B, FBLENDVB)
+SSE_HELPER_V_AVX(helper_blendvps, L, NUM_L, FBLENDVPS)
+SSE_HELPER_V_AVX(helper_blendvpd, Q, NUM_D, FBLENDVPD)
+
+#undef FBLENDVB
+#undef FBLENDVPS
+#undef FBLENDVPD
+
+#define SSE_HELPER_I_AVX(name, elem, num, F)\
+void glue(name, ASUFFIX) (Reg *d, Reg *b, Reg *a, uint32_t imm)	\
+{\
+    int i;\
+    for (i = 0; i < num; i++) {\
+        d->elem(i) = F(a->elem(i), b->elem(i), ((imm >> i) & 1));\
+    }\
+}
+
+#define FBLENDP(d, s, m) m ? s : d
+SSE_HELPER_I_AVX(helper_blendps, L, 4, FBLENDP)
+SSE_HELPER_I_AVX(helper_blendpd, Q, 2, FBLENDP)
+SSE_HELPER_I_AVX(helper_pblendw, W, 8, FBLENDP)
 
 #undef Reg
 #undef B
@@ -692,6 +716,10 @@ void glue(helper_vbroadcastss, ASUFFIX)(Reg *d, uint32_t m)
 #undef NUM_S
 #undef NUM_L
 #undef NUM_D
+#undef NUM_B
+#undef NUM_Q
 #undef AVX128_CLEAR_UPPER
 #undef AVX128_ONLY
 #undef AVX256_ONLY
+#undef SSE_HELPER_V
+#undef SSE_HELPER_I_AVX

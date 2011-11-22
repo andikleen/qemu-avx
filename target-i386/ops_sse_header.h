@@ -1,5 +1,5 @@
 /*
- *  MMX/3DNow!/SSE/SSE2/SSE3/SSSE3/SSE4/PNI support
+ *  MMX/3DNow!/SSE/SSE2/SSE3/SSSE3/SSE4/PNI/AVX support
  *
  *  Copyright (c) 2005 Fabrice Bellard
  *
@@ -54,13 +54,26 @@
 	AVX_ONLY(DEF_HELPER_2(glue(name,_avx), void, Reg, Reg))	\
 	AVX_ONLY(DEF_HELPER_2(glue(name,_256), void, Reg, Reg))
 
+#define DEF_HELPER_AVX256_4OP(name, suffix)				\
+	DEF_HELPER_2(glue(name, suffix), void, Reg, Reg)		\
+	AVX_ONLY(DEF_HELPER_4(glue(name,_avx), void, Reg, Reg, Reg, Reg)) \
+	AVX_ONLY(DEF_HELPER_4(glue(name,_256), void, Reg, Reg, Reg, Reg))
+
 #define DEF_HELPER_AVX128_3(name, suffix, a, b, c, d)		\
 	DEF_HELPER_3(glue(name, suffix), a, b, c, d)		\
 	AVX_ONLY(DEF_HELPER_3(glue(name,_avx), a, b, c, d))
 
-#define DEF_HELPER_AVX256_3(name, suffix, a, b, c, d)		\
+#define DEF_HELPER_AVX128_4(name, suffix, a, b, c, d, e)	\
+	DEF_HELPER_3(glue(name, suffix), a, c, d, e)		\
+	AVX_ONLY(DEF_HELPER_4(glue(name,_avx), a, b, c, d, e))
+
+#define DEF_HELPER_AVX256_3(name, suffix, a, b, c, d)	\
 	DEF_HELPER_AVX128_3(name, suffix, a, b, c, d)	\
 	AVX_ONLY(DEF_HELPER_3(glue(name,_256), a, b, c, d))
+
+#define DEF_HELPER_AVX256_4(name, suffix, a, b, c, d, e)	\
+	DEF_HELPER_AVX128_4(name, suffix, a, b, c, d, e)	\
+	AVX_ONLY(DEF_HELPER_4(glue(name,_256), a, b, c, d, e))
 
 DEF_HELPER_AVX128(psrlw,SUFFIX)
 DEF_HELPER_AVX128(psraw,SUFFIX)
@@ -164,12 +177,10 @@ DEF_HELPER_3(glue(pshuflw, SUFFIX), void, Reg, Reg, int)
 DEF_HELPER_3(glue(pshufhw, SUFFIX), void, Reg, Reg, int)
 #endif
 
-#if 0
-AVX_ONLY(DEF_HELPER_2(vbroadcastsd_avx, void, Reg, uint64_t)); // XXX
-AVX_ONLY(DEF_HELPER_2(vbroadcastsd_256, void, Reg, uint64_t)); // XXX
-AVX_ONLY(DEF_HELPER_2(vbroadcastss_avx, void, Reg, uint32_t));
-AVX_ONLY(DEF_HELPER_2(vbroadcastss_256, void, Reg, uint32_t));
-#endif
+AVX_ONLY(DEF_HELPER_2(broadcastsd_avx, void, Reg, i64));
+AVX_ONLY(DEF_HELPER_2(broadcastsd_256, void, Reg, i64));
+AVX_ONLY(DEF_HELPER_2(broadcastss_avx, void, Reg, i32));
+AVX_ONLY(DEF_HELPER_2(broadcastss_256, void, Reg, i32));
 
 #if SHIFT == 1
 /* FPU ops */
@@ -360,9 +371,9 @@ DEF_HELPER_3(glue(palignr, SUFFIX), void, Reg, Reg, s32)
 
 /* SSE4.1 op helpers */
 #if SHIFT == 1
-DEF_HELPER_2(glue(pblendvb, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(blendvps, SUFFIX), void, Reg, Reg)
-DEF_HELPER_2(glue(blendvpd, SUFFIX), void, Reg, Reg)
+DEF_HELPER_AVX256_4OP(pblendvb, SUFFIX)
+DEF_HELPER_AVX256_4OP(blendvps, SUFFIX)
+DEF_HELPER_AVX256_4OP(blendvpd, SUFFIX)
 DEF_HELPER_2(glue(ptest, SUFFIX), void, Reg, Reg)
 DEF_HELPER_2(glue(pmovsxbw, SUFFIX), void, Reg, Reg)
 DEF_HELPER_2(glue(pmovsxbd, SUFFIX), void, Reg, Reg)
@@ -393,9 +404,9 @@ DEF_HELPER_AVX256_3(roundps, SUFFIX, void, Reg, Reg, i32)
 DEF_HELPER_AVX256_3(roundpd, SUFFIX, void, Reg, Reg, i32)
 DEF_HELPER_AVX128_3(roundss, SUFFIX, void, Reg, Reg, i32)
 DEF_HELPER_AVX128_3(roundsd, SUFFIX, void, Reg, Reg, i32)
-DEF_HELPER_3(glue(blendps, SUFFIX), void, Reg, Reg, i32)
-DEF_HELPER_3(glue(blendpd, SUFFIX), void, Reg, Reg, i32)
-DEF_HELPER_3(glue(pblendw, SUFFIX), void, Reg, Reg, i32)
+DEF_HELPER_AVX256_4(blendpd, SUFFIX, void, Reg, Reg, Reg, i32)
+DEF_HELPER_AVX256_4(blendps, SUFFIX, void, Reg, Reg, Reg, i32)
+DEF_HELPER_AVX256_4(pblendw, SUFFIX, void, Reg, Reg, Reg, i32)
 DEF_HELPER_3(glue(dpps, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(dppd, SUFFIX), void, Reg, Reg, i32)
 DEF_HELPER_3(glue(mpsadbw, SUFFIX), void, Reg, Reg, i32)

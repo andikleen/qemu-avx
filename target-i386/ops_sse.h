@@ -1788,6 +1788,9 @@ void glue(name, SUFFIX) (Reg *d, Reg *s, uint32_t imm)\
 SSE_HELPER_V(helper_pblendvb, B, 16, FBLENDVB)
 SSE_HELPER_V(helper_blendvps, L, 4, FBLENDVPS)
 SSE_HELPER_V(helper_blendvpd, Q, 2, FBLENDVPD)
+#undef FBLENDVB
+#undef FBLENDVPS
+#undef FBLENDVPD
 
 void glue(helper_ptest, SUFFIX) (Reg *d, Reg *s)
 {
@@ -2265,3 +2268,4 @@ target_ulong helper_popcnt(target_ulong n, uint32_t type)
 #undef Q
 #undef SUFFIX
 #undef AVX_ONLY
+#undef SSE_HELPER_V

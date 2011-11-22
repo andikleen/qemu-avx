@@ -3346,14 +3346,30 @@ static struct sse_op_helper_s sse_op_table6[256] = {
     [0x41] = SSE41_OP(phminposuw),
 };
 
-/* 3op */
+/* VEX 0f 38 3op */
 static void *avx_op_table6[256][2] = {
+    [0x0c] = { NULL, gen_helper_blendps_avx },
+    [0x0d] = { NULL, gen_helper_blendpd_avx },
+    [0x0e] = { NULL, gen_helper_pblendw_avx },
+    [0x14] = { NULL, gen_helper_blendvps_avx },
+    [0x15] = { NULL, gen_helper_blendvpd_avx },
+
+    [0x18] = { NULL, gen_helper_broadcastss_avx },
+    [0x19] = { NULL, gen_helper_broadcastsd_avx },
+
     // or 4?
     // XXX
 };
 
 /* 3op */
 static void *avx_op_table6_256[256][2] = {
+    [0x14] = { NULL, gen_helper_blendvps_256 },
+    [0x15] = { NULL, gen_helper_blendvpd_256 },
+
+    [0x18] = { NULL, gen_helper_broadcastss_256 },
+    [0x19] = { NULL, gen_helper_broadcastsd_256 },
+
+
     // XXX
 };
 
@@ -3388,10 +3404,8 @@ static void *avx_op_table7[256][2] = {
     [0x09] = { NULL, gen_helper_roundpd_avx },
     [0x0a] = { NULL, gen_helper_roundss_avx },
     [0x0b] = { NULL, gen_helper_roundsd_avx },
-#if 0
     [0x0c] = { NULL, gen_helper_blendps_avx },
     [0x0d] = { NULL, gen_helper_blendpd_avx },
-#endif
     /* XXX finish me */
 };
 
@@ -4628,6 +4642,10 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	    s->dflag = 2;
 	l = b2 & 0x4;
 	v = ~(b2 >> 3) & 0xf;
+	if (b2 & 0x80) { /* W */
+	    /* XXX check for 0 on non legacy avx instruction */
+	    s->dflag = 2;
+	} 
     } else { /* 2 byte */
 	pp = b1 & 3; /* 0: none, 1: 66, 2: f3, 3: f2 */
 	mm = 1;
