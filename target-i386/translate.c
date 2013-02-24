@@ -3079,7 +3079,7 @@ static void *avx_op_table1[256][4] = {
 #define AVX256_FOP(x) { gen_helper_ ## x ## ps_256, gen_helper_ ## x ## pd_256 }
 
 /* AVX 256bit commands, using 3op helpers */
-static void *avx_op_table1_256[256][2] = {
+static void *avx_op_table1_256[256][4] = {
     [0x10] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x11] = { SSE_SPECIAL, SSE_SPECIAL }, /* movups, movupd */
     [0x12] = { SSE_SPECIAL, SSE_SPECIAL }, /* movlps, movlpd, movsldup, movddup */
