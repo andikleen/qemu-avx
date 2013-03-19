@@ -4686,10 +4686,10 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	    return 1;
 	if (l) {
 	    mode = VEX256;
-	    sse_op2 = avx_op_table7_256[op][pp];
+	    sse_op2 = avx_op_table6_256[op][pp];
 	} else {
 	    mode = VEX128;
-	    sse_op2 = avx_op_table7[op][pp];
+	    sse_op2 = avx_op_table6[op][pp];
 	}
 	return gen_sse_op38(s, op, pp, rex_r, l, v, sse_op2, mode); 
     case 3: /* 0f 3a */
@@ -4697,10 +4697,10 @@ static int __attribute__((noinline)) gen_vex(DisasContext *s, int b, int b1, tar
 	    return 1;
 	if (l) {
 	    mode = VEX256;
-	    sse_op2 = avx_op_table6_256[op][pp];
+	    sse_op2 = avx_op_table7_256[op][pp];
 	} else {
 	    mode = VEX128;
-	    sse_op2 = avx_op_table6[op][pp];
+	    sse_op2 = avx_op_table7[op][pp];
 	}
 	return gen_sse_op3a(s, op, pp, rex_r, l, v, sse_op2, mode);
     default:
