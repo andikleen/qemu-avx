@@ -1,4 +1,4 @@
-![qemu-avx](http://halobates.de/qemu-avx.jpg)
+![qemu-avx] (http://halobates.de/qemu-avx.png)
 
 AVX1 support of qemu
 
